@@ -1,0 +1,10 @@
+[package]
+name = "sguard"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+hyper = { workspace = true }
+http-body-util = "0.1.2"
+hyper-util = { version = "0.1.6", features = ["full"]}

@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [ "sguard",
+    "sguard-core", 
+    "sguard-http",
+    "sguard", 
+    "sguard-filter"
+]
+
+
+[workspace.dependencies]
+http = "1.1.0"
+tokio = { version = "1.38.1", features = ["full"] }
+hyper = { version = "1", features = ["full"] }
