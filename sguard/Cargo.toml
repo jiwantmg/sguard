@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 tokio = { workspace = true }
 sguard-http = { version = "0.1.0", path = "../sguard-http", default-features = false }
+log = { workspace = true }
+log4rs = { workspace = true }

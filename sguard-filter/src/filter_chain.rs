@@ -26,7 +26,7 @@ impl FilterChain {
                     -> Pin<Box<dyn Future<Output = Result<Response<Body>, Error>> + Send>>
                 + Send
                 + Sync,
-        > = Arc::new(|req| Box::pin(async move { Ok(Response::new(Body::from("End of chain"))) }));
+        > = Arc::new(|_req| Box::pin(async move { Ok(Response::new(Body::from("End of chain"))) }));
 
         // Build the filter chain in reverse order
         let mut next = end_of_chain;
