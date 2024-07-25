@@ -1,3 +1,4 @@
+pub mod basic;
 use crate::core::{Filter, FilterFn, FilterRs};
 use crate::filter_chain::FilterChainTrait;
 use hyper::{Body, Request};
@@ -32,7 +33,6 @@ impl Filter for AuthFilter {
             // Use the `chain_handler` here
             return chain_handler(req_child);
         }
-
         next(req)
     }
 }
@@ -42,22 +42,5 @@ impl FilterChainTrait for AuthFilter {}
 impl AuthFilterTrait for AuthFilter {
     fn sub_filter_chain(&self) -> Option<Arc<dyn AuthFilterTrait>> {
         None
-    }
-}
-
-pub struct BasicAuthFilterChain;
-
-impl Filter for BasicAuthFilterChain {
-    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
-        log::debug!("Filter: Basic AuthFilter");
-        // Perform authentication logic here
-        next(req)
-    }
-}
-
-impl FilterChainTrait for BasicAuthFilterChain {}
-impl AuthFilterTrait for BasicAuthFilterChain {
-    fn sub_filter_chain(&self) -> Option<Arc<dyn AuthFilterTrait>> {
-        todo!()
     }
 }
