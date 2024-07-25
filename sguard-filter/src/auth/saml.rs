@@ -4,18 +4,18 @@ use hyper::{Body, Request};
 use std::sync::Arc;
 
 use super::AuthFilterTrait;
-pub struct SGuardBasicAuthFilter;
+pub struct SGuardSamlAuth;
 
-impl Filter for SGuardBasicAuthFilter {
+impl Filter for SGuardSamlAuth {
     fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
-        log::debug!("Filter: Basic AuthFilter");
+        log::debug!("Filter: Ldap authentications");
         // Perform authentication logic here
         next(req)
     }
 }
 
-impl FilterChainTrait for SGuardBasicAuthFilter {}
-impl AuthFilterTrait for SGuardBasicAuthFilter {
+impl FilterChainTrait for SGuardSamlAuth {}
+impl AuthFilterTrait for SGuardSamlAuth {
     fn sub_filter_chain(&self) -> Option<Arc<dyn AuthFilterTrait>> {
         todo!()
     }
