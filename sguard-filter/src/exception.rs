@@ -2,35 +2,27 @@ use std::{future::Future, pin::Pin, sync::Arc};
 
 use hyper::{Body, Error, Request, Response};
 
-use crate::{core::Filter, filter_chain::FilterChain};
+use crate::core::{Filter, FilterFn, FilterRs};
+use crate::filter_chain::FilterChainTrait;
 
+pub trait ExceptionTranslationFilterTrait: FilterChainTrait{
+    fn sub_filter_chain(&self) -> Option<Arc<dyn ExceptionTranslationFilterTrait>>;
+}
 pub struct ExceptionTranslationFilter {
-    sub_chain: Option<Arc<FilterChain>>,
+    sub_chain: Option<Arc<dyn ExceptionTranslationFilterTrait>>,
 }
 impl ExceptionTranslationFilter {
-    pub fn new(sub_chain: Option<Arc<FilterChain>>) -> Self {
+    pub fn new(sub_chain: Option<Arc<dyn ExceptionTranslationFilterTrait>>) -> Self {
         ExceptionTranslationFilter { sub_chain }
     }
 }
 impl Filter for ExceptionTranslationFilter {
-    fn handle(
-        &self,
-        req: &Request<Body>,
-        next: Arc<
-            (dyn Fn(
-                &hyper::Request<Body>,
-            ) -> Pin<
-                Box<(dyn Future<Output = Result<Response<Body>, hyper::Error>> + Send + 'static)>,
-            > + Send
-                 + Sync
-                 + 'static),
-        >,
-    ) -> Pin<Box<dyn Future<Output = Result<Response<Body>, Error>> + Send>> {
+    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
         log::debug!("Filter: ExceptionTranslationFilter");
         next(req)
     }
 
-    fn sub_filter_chain(&self) -> Option<Arc<FilterChain>> {
-        self.sub_chain.clone()
+    fn sub_filter_chain(&self) -> Option<Arc<dyn Filter>> {
+        todo!()
     }
 }

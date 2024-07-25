@@ -3,8 +3,10 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use crate::core::Filter;
+use crate::core::{Filter, FilterFn, FilterRs};
 
+pub trait FilterChainTrait: Filter {
+}
 pub struct FilterChain {
     filters: Vec<Arc<dyn Filter>>,
 }
@@ -13,39 +15,29 @@ impl FilterChain {
     pub fn new(filters: Vec<Arc<dyn Filter>>) -> Self {
         FilterChain { filters }
     }
+}
 
-    pub fn handle(
-        &self,
-        req: &Request<Body>,
-        next: Option<Arc<
-            dyn Fn(
-                &Request<Body>,
-            )
-                -> Pin<Box<dyn Future<Output = Result<Response<Body>, Error>> + Send>>
-            + Send
-            + Sync,
-        >>,
-    ) -> Pin<Box<dyn Future<Output = Result<Response<Body>, Error>> + Send>> {
-        // Create an initial "end of chain" handler
-        let end_of_chain: Arc<
-            dyn Fn(
-                    &Request<Body>,
-                )
-                    -> Pin<Box<dyn Future<Output = Result<Response<Body>, Error>> + Send>>
-                + Send
-                + Sync,
-        > = Arc::new(|_req| Box::pin(async move { Ok(Response::new(Body::from("End of chain"))) }));
-            // Build the filter chain in reverse order
-            let mut next: Arc<dyn Fn(&Request<Body>) -> Pin<Box<dyn Future<Output = Result<Response<Body>, Error>> + Send>> + Send + Sync> = end_of_chain.clone();
+impl Filter for FilterChain {
+    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
+        // Build the filter chain in reverse order
+        let mut next =  next.clone();
 
-            for filter in self.filters.iter().rev() {
-                let current_next = next.clone();
-                let filter = filter.clone();
-                next = Arc::new(move |req| filter.handle(req, current_next.clone()));
-             }
+        for filter in self.filters.iter().rev() {
+            let current_next = next.clone();
+            let filter = filter.clone();
+            next = Arc::new(move |req| filter.handle(req, current_next.clone()));
+        }
 
-            // Execute the filter chain
-            next(req)
+        // Execute the filter chain
+        next(req)
 
     }
+
+    fn sub_filter_chain(&self) -> Option<Arc<dyn Filter>> {
+        todo!()
+    }
+}
+
+impl FilterChainTrait for FilterChain {
+
 }
