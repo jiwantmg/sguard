@@ -1,12 +1,8 @@
-use hyper::{Body, Error, Request, Response};
-use std::future::Future;
-use std::pin::Pin;
+use crate::core::{Filter, FilterFn, FilterRs};
+use hyper::{Body, Request};
 use std::sync::Arc;
 
-use crate::core::{Filter, FilterFn, FilterRs};
-
-pub trait FilterChainTrait: Filter {
-}
+pub trait FilterChainTrait: Filter {}
 pub struct FilterChain {
     filters: Vec<Arc<dyn Filter>>,
 }
@@ -20,7 +16,7 @@ impl FilterChain {
 impl Filter for FilterChain {
     fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
         // Build the filter chain in reverse order
-        let mut next =  next.clone();
+        let mut next = next.clone();
 
         for filter in self.filters.iter().rev() {
             let current_next = next.clone();
@@ -30,14 +26,7 @@ impl Filter for FilterChain {
 
         // Execute the filter chain
         next(req)
-
-    }
-
-    fn sub_filter_chain(&self) -> Option<Arc<dyn Filter>> {
-        todo!()
     }
 }
 
-impl FilterChainTrait for FilterChain {
-
-}
+impl FilterChainTrait for FilterChain {}

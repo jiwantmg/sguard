@@ -1,9 +1,7 @@
-use std::{future::Future, pin::Pin, sync::Arc};
-
-use hyper::{Body, Error, Request, Response};
-
 use crate::core::{Filter, FilterFn, FilterRs};
 use crate::filter_chain::FilterChainTrait;
+use hyper::{Body, Request};
+use std::sync::Arc;
 
 pub trait AuthFilterTrait: FilterChainTrait {
     fn sub_filter_chain(&self) -> Option<Arc<dyn AuthFilterTrait>>;
@@ -30,29 +28,22 @@ impl Filter for AuthFilter {
                 let current_next = current_next.clone();
                 chain.handle(req, current_next)
             }));
-            let req_child= &req;
+            let req_child = &req;
             // Use the `chain_handler` here
-            chain_handler(req_child);
+            return chain_handler(req_child);
         }
 
         next(req)
     }
-
-    fn sub_filter_chain(&self) -> Option<Arc<dyn Filter>> {
-        todo!()
-    }
 }
 
+impl FilterChainTrait for AuthFilter {}
 
-impl FilterChainTrait for AuthFilter {
-}
 impl AuthFilterTrait for AuthFilter {
     fn sub_filter_chain(&self) -> Option<Arc<dyn AuthFilterTrait>> {
         None
     }
 }
-
-
 
 pub struct BasicAuthFilterChain;
 
@@ -62,15 +53,9 @@ impl Filter for BasicAuthFilterChain {
         // Perform authentication logic here
         next(req)
     }
-
-    fn sub_filter_chain(&self) -> Option<Arc<dyn Filter>> {
-        todo!()
-    }
 }
 
-impl FilterChainTrait for BasicAuthFilterChain {
-
-}
+impl FilterChainTrait for BasicAuthFilterChain {}
 impl AuthFilterTrait for BasicAuthFilterChain {
     fn sub_filter_chain(&self) -> Option<Arc<dyn AuthFilterTrait>> {
         todo!()

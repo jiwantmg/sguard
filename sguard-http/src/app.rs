@@ -1,8 +1,7 @@
-use std::future::Future;
-use std::pin::Pin;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Error, Request, Response, Server};
-//use sguard_filter::auth::{AuthFilter, BasicAuthFilterChain};
+use hyper::{Body, Error, Response, Server};
+use sguard_filter::auth::{AuthFilter, BasicAuthFilterChain};
+use sguard_filter::core::{Filter, FilterFn};
 use sguard_filter::exception::ExceptionTranslationFilter;
 use sguard_filter::filter_chain::FilterChain;
 use sguard_filter::http::HeaderWriterFilter;
@@ -11,8 +10,6 @@ use sguard_filter::security::CsrfFilter;
 use sguard_filter::session::SessionManagementFilter;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use sguard_filter::auth::{AuthFilter, BasicAuthFilterChain};
-use sguard_filter::core::Filter;
 
 pub struct AppBuilder {
     filter_chain: Arc<Mutex<FilterChain>>,
@@ -25,7 +22,6 @@ impl AppBuilder {
         }
     }
     pub fn app_builder(&mut self) {
-        let optional_empty_filter_chain = Some(Arc::new(FilterChain::new(vec![])));
         //let basic_auth_filter = Arc::new(BasicAuthFilterChain::new());
         let csrf_filter = Arc::new(CsrfFilter::new(None));
 
@@ -54,16 +50,11 @@ impl AppBuilder {
                 Ok::<_, Error>(service_fn(move |req| {
                     let filter_chain = filter_chain.clone();
                     async move {
-                        let end_of_chain: Arc<
-                            dyn Fn(
-                                &Request<Body>,
-                            )
-                                -> Pin<Box<dyn Future<Output = Result<Response<Body>, Error>> + Send>>
-                            + Send
-                            + Sync,
-                        > = Arc::new(|_req| Box::pin(async move { Ok(Response::new(Body::from("End of chain"))) }));
+                        let end_of_chain: FilterFn = Arc::new(|_req| {
+                            Box::pin(async move { Ok(Response::new(Body::from("End of chain"))) })
+                        });
                         // Build the filter chain in reverse order
-                        let mut next: Arc<dyn Fn(&Request<Body>) -> Pin<Box<dyn Future<Output = Result<Response<Body>, Error>> + Send>> + Send + Sync> = end_of_chain.clone();
+                        let next: FilterFn = end_of_chain.clone();
 
                         let filter_chain = filter_chain.lock().await;
                         return filter_chain.handle(&req, next).await;

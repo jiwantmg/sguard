@@ -1,7 +1,7 @@
-use std::{future::Future, pin::Pin, sync::Arc};
-use hyper::{Body, Error, Request, Response};
 use crate::core::{Filter, FilterFn, FilterRs};
 use crate::filter_chain::FilterChainTrait;
+use hyper::{Body, Request};
+use std::sync::Arc;
 
 pub trait CsrfFilterTrait: FilterChainTrait {
     fn sub_filter_chain(&self) -> Option<Arc<dyn CsrfFilterTrait>>;
@@ -23,9 +23,5 @@ impl Filter for CsrfFilter {
         //     Arc::new(move |req| chain.handle(req, Some(current_next.clone())));
         // }
         next(req)
-    }
-
-    fn sub_filter_chain(&self) -> Option<Arc<dyn Filter>> {
-        todo!()
     }
 }
