@@ -1,0 +1,8 @@
+[package]
+name = "sguard-filter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hyper = { workspace = true }
+log = { workspace = true }

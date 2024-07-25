@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = [ "sguard",
+    "sguard-core",
+    "sguard-http",
+    "sguard",
+    "sguard-filter"
+]
+
+
+[workspace.dependencies]
+http = "1.1.0"
+log = "0.4.22"
+log4rs = "1.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+tokio = { version = "1.38.1", features = ["full"] }
+hyper = { version = "0.14", features = ["full"] }

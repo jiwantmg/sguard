@@ -1,0 +1,26 @@
+# log4rs.yaml
+appenders:
+  stdout:
+    kind: console
+    encoder:
+      pattern: "{d} - {l} - {m}\n"
+
+  file:
+    kind: file
+    path: "log/output.log"
+    encoder:
+      pattern: "{d} - {l} - {m}\n"
+
+root:
+  level: debug
+  appenders:
+    - stdout
+    - file
+
+loggers:
+  my_crate:
+    level: debug
+    appenders:
+      - stdout
+      - file
+    additive: false

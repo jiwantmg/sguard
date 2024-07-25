@@ -1,0 +1,4 @@
+routes:
+  id: user-srevice
+  url: http://localhost:3000
+  pattern: api/user/*
