@@ -21,6 +21,7 @@ impl LoggingFilter {
 impl Filter for LoggingFilter {
     fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
         log::debug!("Filter: LoggingFilter");
+        panic!("Un recoverable error");
         next(req)
     }
 }

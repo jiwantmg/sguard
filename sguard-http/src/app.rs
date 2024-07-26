@@ -1,6 +1,6 @@
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Error, Response, Server};
-use sguard_filter::auth::basic::BasicAuthFilter;
+use sguard_filter::auth::basic::SGuardBasicAuthFilter;
 use sguard_filter::auth::AuthFilter;
 use sguard_filter::core::{Filter, FilterFn};
 use sguard_filter::exception::ExceptionTranslationFilter;
@@ -25,7 +25,7 @@ impl AppBuilder {
     pub fn app_builder(&mut self) {
         let csrf_filter = Arc::new(CsrfFilter::new(None));
 
-        let auth_filter = Arc::new(AuthFilter::new(Some(Arc::new(BasicAuthFilter))));
+        let auth_filter = Arc::new(AuthFilter::new(Some(Arc::new(SGuardBasicAuthFilter))));
 
         let logging_filter = Arc::new(LoggingFilter::new(None));
         //let logout_filter = Arc::new(LogoutFilter::new(optional_empty_filter_chain.clone()));
