@@ -1,5 +1,9 @@
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Error, Response, Server};
+use hyper::{Body, Server};
+use serde;
+use serde::{Deserialize, Serialize};
+use sguard_core::http::ResponseEntity;
+use sguard_error::Error;
 use sguard_filter::auth::basic::SGuardBasicAuthFilter;
 use sguard_filter::auth::AuthFilter;
 use sguard_filter::core::{Filter, FilterFn};
@@ -50,14 +54,30 @@ impl AppBuilder {
                 Ok::<_, Error>(service_fn(move |req| {
                     let filter_chain = filter_chain.clone();
                     async move {
+                        #[derive(Serialize, Deserialize, Debug)]
+                        struct Test {
+                            name: String,
+                        }
                         let end_of_chain: FilterFn = Arc::new(|_req| {
-                            Box::pin(async move { Ok(Response::new(Body::from("End of chain\n"))) })
+                            let test = Test {
+                                name: String::from("jiwan"),
+                            };
+                            let json_data = serde_json::to_string(&test);
+                            //let rsponse = ResponseEntity::build_success(Body::from(json_data));
+                            let response = ResponseEntity::build_error(Error::new(
+                                sguard_error::ErrorType::ConnectError,
+                            ));
+                            Box::pin(async move { Ok(response) })
                         });
                         // Build the filter chain in reverse order
                         let next: FilterFn = end_of_chain.clone();
 
                         let filter_chain = filter_chain.lock().await;
-                        return filter_chain.handle(&req, next).await;
+                        let result = filter_chain.handle(&req, next).await;
+                        match result {
+                            Ok(response) => Ok(response),
+                            Err(e) => Result::Err((e)),
+                        }
                     }
                 }))
             }

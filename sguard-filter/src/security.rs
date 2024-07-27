@@ -1,6 +1,7 @@
 use crate::core::{Filter, FilterFn, FilterRs};
 use crate::filter_chain::FilterChainTrait;
 use hyper::{Body, Request};
+use sguard_error::ErrorType;
 use std::sync::Arc;
 
 pub trait CsrfFilterTrait: FilterChainTrait {
@@ -14,6 +15,10 @@ impl CsrfFilter {
         CsrfFilter { sub_chain }
     }
 }
+
+// Error type returned when CSRF is invalid
+pub const ERR_INVALID_CSRF: ErrorType = ErrorType::Custom("INVALID CSRF");
+
 impl Filter for CsrfFilter {
     fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
         log::debug!("Filter: CsrfFilter");

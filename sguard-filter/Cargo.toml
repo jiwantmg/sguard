@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 hyper = { workspace = true }
 log = { workspace = true }
+sguard-error = { version = "0.1.0", path = "../sguard-error" }

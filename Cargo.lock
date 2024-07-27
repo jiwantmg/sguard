@@ -663,6 +663,19 @@ dependencies = [
 [[package]]
 name = "sguard-core"
 version = "0.1.0"
+dependencies = [
+ "http 1.1.0",
+ "hyper",
+ "serde_json",
+ "sguard-error",
+]
+
+[[package]]
+name = "sguard-error"
+version = "0.1.0"
+dependencies = [
+ "http 1.1.0",
+]
 
 [[package]]
 name = "sguard-filter"
@@ -670,6 +683,7 @@ version = "0.1.0"
 dependencies = [
  "hyper",
  "log",
+ "sguard-error",
 ]
 
 [[package]]
@@ -678,6 +692,10 @@ version = "0.1.0"
 dependencies = [
  "http 1.1.0",
  "hyper",
+ "serde",
+ "serde_json",
+ "sguard-core",
+ "sguard-error",
  "sguard-filter",
  "tokio",
 ]
