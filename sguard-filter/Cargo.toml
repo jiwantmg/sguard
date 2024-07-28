@@ -6,4 +6,6 @@ edition = "2021"
 [dependencies]
 hyper = { workspace = true }
 log = { workspace = true }
+tokio = { workspace = true }
 sguard-error = { version = "0.1.0", path = "../sguard-error" }
+sguard-proxy = { version = "0.1.0", path = "../sguard-proxy" }

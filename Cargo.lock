@@ -684,6 +684,8 @@ dependencies = [
  "hyper",
  "log",
  "sguard-error",
+ "sguard-proxy",
+ "tokio",
 ]
 
 [[package]]
@@ -697,6 +699,14 @@ dependencies = [
  "sguard-core",
  "sguard-error",
  "sguard-filter",
+ "tokio",
+]
+
+[[package]]
+name = "sguard-proxy"
+version = "0.1.0"
+dependencies = [
+ "hyper",
  "tokio",
 ]
 

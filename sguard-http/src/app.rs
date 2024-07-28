@@ -1,5 +1,5 @@
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Server};
+use hyper::Server;
 use serde;
 use serde::{Deserialize, Serialize};
 use sguard_core::http::ResponseEntity;
@@ -11,8 +11,10 @@ use sguard_filter::exception::ExceptionTranslationFilter;
 use sguard_filter::filter_chain::FilterChain;
 use sguard_filter::http::HeaderWriterFilter;
 use sguard_filter::logging::LoggingFilter;
+use sguard_filter::routing::RoutingFilter;
 use sguard_filter::security::CsrfFilter;
 use sguard_filter::session::SessionManagementFilter;
+use sguard_filter::upstream::UpstreamtFilter;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -36,7 +38,8 @@ impl AppBuilder {
         let session_management_filter = Arc::new(SessionManagementFilter::new(None));
         let exception_translation_filter = Arc::new(ExceptionTranslationFilter::new(None));
         let header_writer_filter = Arc::new(HeaderWriterFilter::new(None));
-
+        let routing_filter = Arc::new(RoutingFilter::new());
+        let upstream_filter = Arc::new(UpstreamtFilter::new());
         self.filter_chain = Arc::new(Mutex::new(FilterChain::new(vec![
             csrf_filter,
             auth_filter,
@@ -44,6 +47,8 @@ impl AppBuilder {
             session_management_filter,
             exception_translation_filter,
             header_writer_filter,
+            routing_filter,
+            upstream_filter,
         ])));
     }
 
@@ -76,7 +81,7 @@ impl AppBuilder {
                         let result = filter_chain.handle(&req, next).await;
                         match result {
                             Ok(response) => Ok(response),
-                            Err(e) => Result::Err((e)),
+                            Err(e) => Result::Err(e),
                         }
                     }
                 }))
