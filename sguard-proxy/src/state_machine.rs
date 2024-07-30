@@ -1,7 +1,8 @@
 use hyper::{Body, Request, Response};
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::MutexGuard;
+use serde::{Deserialize, Serialize};
+use sguard_core::http::ResponseEntity;
+use sguard_error::Error;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{mpsc, Mutex};
 
 #[derive(Debug)]
@@ -29,6 +30,7 @@ pub struct StateMachine {
     tx: mpsc::Sender<ConnectionEvent>,
     rx: mpsc::Receiver<ConnectionEvent>,
     response: Arc<Mutex<Option<Response<Body>>>>,
+    on_completed: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
 }
 
 impl StateMachine {
@@ -36,6 +38,7 @@ impl StateMachine {
         req: Arc<Mutex<Request<Body>>>,
         tx: mpsc::Sender<ConnectionEvent>,
         rx: mpsc::Receiver<ConnectionEvent>,
+        on_completed: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
     ) -> Self {
         Self {
             state: State::Idle,
@@ -43,6 +46,7 @@ impl StateMachine {
             tx,
             rx,
             response: Arc::new(Mutex::new(None)),
+            on_completed,
         }
     }
 
@@ -56,63 +60,72 @@ impl StateMachine {
         match self.state {
             State::Idle => match event {
                 ConnectionEvent::Connect => {
-                    println!("Transitioning from Idle to Connecting");
+                    log::debug!("Transitioning from Idle to Connecting");
                     self.state = State::Connecting;
-                    // Simulate async operation
-                    //tokio::time::sleep(Duration::from_secs(1)).await;
                     self.tx.send(ConnectionEvent::Send).await.unwrap();
                 }
-                _ => println!("Unhandled event in Idle state"),
+                _ => log::error!("Unhandled event in Idle state"),
             },
             State::Connecting => match event {
                 ConnectionEvent::Send => {
-                    println!("Transitioning from Connecting to Sending");
+                    log::debug!("Transitioning from Connecting to Sending");
                     self.state = State::Sending;
-                    // Simulate async operation
-                    //tokio::time::sleep(Duration::from_secs(1)).await;
                     self.tx.send(ConnectionEvent::Receive).await.unwrap();
                 }
                 ConnectionEvent::Fail => {
-                    println!("Transitioning from Connecting to Error");
+                    log::debug!("Transitioning from Connecting to Error");
                     self.state = State::Error;
                 }
-                _ => println!("Unhandled event in Connecting state"),
+                _ => log::error!("Unhandled event in Connecting state"),
             },
             State::Sending => match event {
                 ConnectionEvent::Receive => {
-                    println!("Transitioning from Sending to Receiving");
+                    log::debug!("Transitioning from Sending to Receiving");
                     self.state = State::Receiving;
-                    // Simulate async operation
-                    //tokio::time::sleep(Duration::from_secs(1)).await;
                     self.tx.send(ConnectionEvent::Complete).await.unwrap();
                 }
                 ConnectionEvent::Fail => {
-                    println!("Transitioning from Sending to Error");
+                    log::debug!("Transitioning from Sending to Error");
                     self.state = State::Error;
                 }
-                _ => println!("Unhandled event in Sending state"),
+                _ => log::error!("Unhandled event in Sending state"),
             },
             State::Receiving => match event {
                 ConnectionEvent::Complete => {
-                    println!("Transitioning from Receiving to Completed");
+                    log::debug!("Transitioning from Receiving to Completed");
                     self.state = State::Completed;
-                    let response = Response::new(Body::from("Request processed successfully"));
-                    let mut response_lock = self.response.lock().await;
-                    *response_lock = Some(response);
+                    #[derive(Serialize, Deserialize, Debug)]
+                    struct Test {
+                        name: String,
+                    }
+                    let test = Test {
+                        name: String::from("jiwan"),
+                    };
+
+                    let json_data = match serde_json::to_string(&test) {
+                        Ok(json) => json,
+                        Err(_) => String::from("Can not convert to string"),
+                    };
+                    let response = ResponseEntity::build_success(Body::from(json_data));
+                    // let response = ResponseEntity::build_error(Error::new(
+                    //     sguard_error::ErrorType::ConnectError,
+                    // ));
+
+                    if let Some(callback) = self.on_completed.take() {
+                        // Call the closure with the response
+                        callback(response);
+                    }
                 }
                 ConnectionEvent::Fail => {
-                    println!("Transitioning from Receiving to Error");
+                    log::error!("Transitioning from Receiving to Error");
                     self.state = State::Error;
                 }
-                _ => println!("Unhandled event in Receiving state"),
+                _ => log::error!("Unhandled event in Receiving state"),
             },
             State::Completed | State::Error => {
-                println!("Final state reached");
+                log::debug!("Final state reached");
             }
         }
-    }
-    pub async fn get_response(&self) -> MutexGuard<Option<Response<Body>>> {
-        self.response.lock().await
     }
 }
 
@@ -125,31 +138,30 @@ impl StateMachineManager {
     pub fn new() -> Self {
         Self {
             state_machines: Mutex::new(HashMap::new()),
-            next_id: Mutex::new(0),
+            next_id: Mutex::new(0), // Initialize notify
         }
     }
 
-    pub async fn create_state_machine(&self, req: Arc<Mutex<Request<Body>>>) -> usize {
-        // Wrap the request in an Arc<Mutex<_>> for shared access
+    pub async fn create_state_machine(
+        &self,
+        req: Arc<Mutex<Request<Body>>>,
+        response_handler: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
+    ) -> usize {
         let (tx, rx) = mpsc::channel(100);
         let mut next_id = self.next_id.lock().await;
         let id = *next_id;
         *next_id += 1;
         let req = req;
-        // Initialize the StateMachine with the Arc<Mutex<Request<Body>>>
-        let state_machine = Arc::new(Mutex::new(StateMachine::new(req, tx, rx)));
+        let state_machine = Arc::new(Mutex::new(StateMachine::new(req, tx, rx, response_handler)));
         let sm_clone = state_machine.clone();
 
-        // Spawn a task to run the state machine
         tokio::spawn(async move {
             let mut state_machine = sm_clone.lock().await;
             state_machine.run().await;
         });
 
-        // Insert the state machine into the manager
         let mut state_machines = self.state_machines.lock().await;
         state_machines.insert(id, state_machine);
-
         id
     }
 
@@ -158,24 +170,3 @@ impl StateMachineManager {
         state_machines.get(&id).cloned()
     }
 }
-
-// pub async fn handle_request(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
-//     // Handle the HTTP request and simulate state transitions
-//     let (tx, _rx) = mpsc::channel(32);
-//     let state_machine = StateMachine::new(tx);
-
-//     match req.uri().path() {
-//         "/connect" => state_machine.handle_event(ConnectionEvent::Connect).await,
-//         "/success" => state_machine.handle_event(ConnectionEvent::Success).await,
-//         "/failure" => state_machine.handle_event(ConnectionEvent::Failure).await,
-//         "/disconnect" => {
-//             state_machine
-//                 .handle_event(ConnectionEvent::Disconnect)
-//                 .await
-//         }
-//         "/retry" => state_machine.handle_event(ConnectionEvent::Retry).await,
-//         _ => println!("Unknown path"),
-//     }
-
-//     Ok(Response::new(Body::from("State transition handled")))
-// }

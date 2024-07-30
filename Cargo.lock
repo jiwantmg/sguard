@@ -712,8 +712,11 @@ name = "sguard-proxy"
 version = "0.1.0"
 dependencies = [
  "hyper",
+ "log",
  "serde",
  "serde_json",
+ "sguard-core",
+ "sguard-error",
  "tokio",
 ]
 

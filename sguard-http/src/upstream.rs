@@ -47,31 +47,23 @@ impl UpstreamService {
                 let (tx, rx) = oneshot::channel();
 
                 tokio::spawn(async move {
-                    let id = state_machine_manager.create_state_machine(req_new).await;
+                    // Define the closure that will handle the response
+                    let on_completed = Box::new(|response: Response<Body>| {
+                        // Process the response here
+                        let _ = tx.send(response);
+                    });
+                    let id = state_machine_manager
+                        .create_state_machine(req_new, Some(on_completed))
+                        .await;
 
-                    let response = if let Some(state_machine) =
-                        state_machine_manager.get_state_machine(id).await
-                    {
+                    log::debug!("State machine id {}", id);
+                    if let Some(state_machine) = state_machine_manager.get_state_machine(id).await {
                         let mut state_machine = state_machine.lock().await;
                         state_machine.handle_event(ConnectionEvent::Connect).await;
-                        let response_guard = state_machine.get_response().await;
-
-                        if let Some(_response) = response_guard.as_ref() {
-                            let test = Test {
-                                name: String::from("jiwan"),
-                            };
-                            let json_data =
-                                serde_json::to_string(&test).expect("Failed to serialize");
-                            ResponseEntity::build_success(Body::from(json_data))
-                        } else {
-                            ResponseEntity::build_error(SguardError::new(ErrorType::ConnectError))
-                        }
                     } else {
-                        log::debug!("State machine not found");
-                        ResponseEntity::build_error(SguardError::new(ErrorType::ConnectError))
+                        // log::debug!("State machine not found");
+                        // ResponseEntity::build_error(SguardError::new(ErrorType::StateMachineError))
                     };
-
-                    let _ = tx.send(response);
                 });
 
                 // Await the response from the channel

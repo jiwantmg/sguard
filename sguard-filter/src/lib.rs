@@ -7,4 +7,3 @@ pub mod logging;
 pub mod routing;
 pub mod security;
 pub mod session;
-pub mod upstream;

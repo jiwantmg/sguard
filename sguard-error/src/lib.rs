@@ -64,6 +64,7 @@ pub enum ErrorType {
     SocketError,
     // other errors
     InternalError,
+    StateMachineError,
     // catch all
     UnknownError,
     /// Custom error with static string.
@@ -105,6 +106,7 @@ impl ErrorType {
             ErrorType::SocketError => "SocketError",
             ErrorType::InternalError => "InternalError",
             ErrorType::UnknownError => "UnknownError",
+            ErrorType::StateMachineError => "StateMachineError",
             ErrorType::Custom(s) => s,
             ErrorType::CustomCode(s, _) => s,
         }
@@ -132,6 +134,7 @@ impl ErrorType {
             | ErrorType::SocketError => StatusCode::BAD_GATEWAY.as_u16(),
             ErrorType::InternalError => StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
             ErrorType::UnknownError => StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+            ErrorType::StateMachineError => StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
             ErrorType::Custom(_) => todo!(),
             ErrorType::CustomCode(_, _) => todo!(),
         };
