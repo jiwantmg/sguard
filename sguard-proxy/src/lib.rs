@@ -1,6 +1,5 @@
 pub mod proxy_trait;
 pub mod state_machine;
-pub mod upstream;
 
 pub struct Session {
     // /// the HTTP session to downstream (the client)

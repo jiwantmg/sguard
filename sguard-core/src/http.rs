@@ -8,7 +8,11 @@ pub struct ResponseEntity {}
 
 impl ResponseEntity {
     pub fn build_success(data: Body) -> Response<Body> {
-        todo!()
+        Response::builder()
+            .status(200) // Set appropriate HTTP status code
+            .header("Content-Type", "application/json")
+            .body(data)
+            .unwrap()
     }
     pub fn build_error(err: Box<Error>) -> Response<Body> {
         // Optionally, you can use `serde_json` to serialize the error message

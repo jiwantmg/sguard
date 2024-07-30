@@ -22,5 +22,5 @@ loggers:
     level: debug
     appenders:
       - stdout
-      - file
+      # - file
     additive: false
