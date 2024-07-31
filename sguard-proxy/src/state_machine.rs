@@ -1,5 +1,5 @@
-use hyper::{Body, Request, Response};
-use serde::{Deserialize, Serialize};
+use crate::upstream::UpstreamService;
+use hyper::{Body, Method, Request, Response};
 use sguard_core::http::ResponseEntity;
 use sguard_error::Error;
 use std::{collections::HashMap, sync::Arc};
@@ -8,7 +8,7 @@ use tokio::sync::{mpsc, Mutex};
 #[derive(Debug)]
 enum State {
     Idle,
-    Connecting,
+    Starting,
     Sending,
     Receiving,
     Completed,
@@ -17,7 +17,7 @@ enum State {
 
 #[derive(Debug)]
 pub enum ConnectionEvent {
-    Connect,
+    Start,
     Send,
     Receive,
     Complete,
@@ -29,8 +29,8 @@ pub struct StateMachine {
     req: Arc<Mutex<Request<Body>>>,
     tx: mpsc::Sender<ConnectionEvent>,
     rx: mpsc::Receiver<ConnectionEvent>,
-    response: Arc<Mutex<Option<Response<Body>>>>,
     on_completed: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
+    upstream_service: UpstreamService,
 }
 
 impl StateMachine {
@@ -45,32 +45,53 @@ impl StateMachine {
             req,
             tx,
             rx,
-            response: Arc::new(Mutex::new(None)),
             on_completed,
+            upstream_service: UpstreamService::new(),
         }
     }
 
     async fn run(&mut self) {
         while let Some(event) = self.rx.recv().await {
             self.handle_event(event).await;
+            // Exit loop if in a final state
+            if matches!(self.state, State::Completed | State::Error) {
+                break;
+            }
         }
     }
 
     pub async fn handle_event(&mut self, event: ConnectionEvent) {
         match self.state {
             State::Idle => match event {
-                ConnectionEvent::Connect => {
-                    log::debug!("Transitioning from Idle to Connecting");
-                    self.state = State::Connecting;
-                    self.tx.send(ConnectionEvent::Send).await.unwrap();
+                ConnectionEvent::Start => {
+                    log::debug!("Transitioning from Idle to Starting");
+                    let request = self.req.lock().await;
+                    match request.method() {
+                        &Method::GET => {
+                            self.state = State::Starting;
+                            self.tx.send(ConnectionEvent::Receive).await.unwrap()
+                        }
+                        &Method::POST => {
+                            self.state = State::Starting;
+                            self.tx.send(ConnectionEvent::Send).await.unwrap()
+                        }
+                        &Method::DELETE => self.tx.send(ConnectionEvent::Send).await.unwrap(),
+                        &Method::PUT => self.tx.send(ConnectionEvent::Send).await.unwrap(),
+                        _ => self.tx.send(ConnectionEvent::Receive).await.unwrap(),
+                    }
                 }
                 _ => log::error!("Unhandled event in Idle state"),
             },
-            State::Connecting => match event {
+            State::Starting => match event {
                 ConnectionEvent::Send => {
                     log::debug!("Transitioning from Connecting to Sending");
                     self.state = State::Sending;
                     self.tx.send(ConnectionEvent::Receive).await.unwrap();
+                }
+                ConnectionEvent::Receive => {
+                    log::debug!("Transitioning from Sending to Receiving");
+                    self.state = State::Receiving;
+                    self.tx.send(ConnectionEvent::Complete).await.unwrap();
                 }
                 ConnectionEvent::Fail => {
                     log::debug!("Transitioning from Connecting to Error");
@@ -79,11 +100,7 @@ impl StateMachine {
                 _ => log::error!("Unhandled event in Connecting state"),
             },
             State::Sending => match event {
-                ConnectionEvent::Receive => {
-                    log::debug!("Transitioning from Sending to Receiving");
-                    self.state = State::Receiving;
-                    self.tx.send(ConnectionEvent::Complete).await.unwrap();
-                }
+                ConnectionEvent::Receive => {}
                 ConnectionEvent::Fail => {
                     log::debug!("Transitioning from Sending to Error");
                     self.state = State::Error;
@@ -94,26 +111,18 @@ impl StateMachine {
                 ConnectionEvent::Complete => {
                     log::debug!("Transitioning from Receiving to Completed");
                     self.state = State::Completed;
-                    #[derive(Serialize, Deserialize, Debug)]
-                    struct Test {
-                        name: String,
-                    }
-                    let test = Test {
-                        name: String::from("jiwan"),
-                    };
-
-                    let json_data = match serde_json::to_string(&test) {
-                        Ok(json) => json,
-                        Err(_) => String::from("Can not convert to string"),
-                    };
-                    let response = ResponseEntity::build_success(Body::from(json_data));
-                    // let response = ResponseEntity::build_error(Error::new(
-                    //     sguard_error::ErrorType::ConnectError,
-                    // ));
-
                     if let Some(callback) = self.on_completed.take() {
                         // Call the closure with the response
-                        callback(response);
+                        let response = self.upstream_service.call_upstream_service().await;
+                        match response {
+                            Ok(response) => {
+                                callback(ResponseEntity::build_success(Body::from(response)))
+                            }
+                            Err(_) => callback(ResponseEntity::build_error(Error::new(
+                                sguard_error::ErrorType::ConnectError,
+                            ))),
+                        }
+                        self.tx.send(ConnectionEvent::Complete).await.unwrap();
                     }
                 }
                 ConnectionEvent::Fail => {
@@ -125,6 +134,7 @@ impl StateMachine {
             State::Completed | State::Error => {
                 log::debug!("Final state reached");
             }
+            _ => log::error!("Unhandled event in state: {:?}", event),
         }
     }
 }
@@ -154,14 +164,19 @@ impl StateMachineManager {
         let req = req;
         let state_machine = Arc::new(Mutex::new(StateMachine::new(req, tx, rx, response_handler)));
         let sm_clone = state_machine.clone();
-
+        let mut state_machines_clone = self.state_machines.lock().await.clone();
         tokio::spawn(async move {
             let mut state_machine = sm_clone.lock().await;
+            log::debug!("State machine starting running {}", id);
+            state_machine.handle_event(ConnectionEvent::Start).await;
             state_machine.run().await;
+            log::debug!("State machine done {}", id);
+            state_machines_clone.remove(&id);
         });
 
         let mut state_machines = self.state_machines.lock().await;
         state_machines.insert(id, state_machine);
+        log::debug!("Inserting state machine {}", id);
         id
     }
 

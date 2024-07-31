@@ -13,11 +13,6 @@ pub struct UpstreamService {
     state_machine_manager: Arc<StateMachineManager>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Test {
-    name: String,
-}
-
 impl UpstreamService {
     pub fn new() -> Self {
         log::debug!("Creating state machine manager");
@@ -52,18 +47,17 @@ impl UpstreamService {
                         // Process the response here
                         let _ = tx.send(response);
                     });
-                    let id = state_machine_manager
+                    state_machine_manager
                         .create_state_machine(req_new, Some(on_completed))
                         .await;
-
-                    log::debug!("State machine id {}", id);
-                    if let Some(state_machine) = state_machine_manager.get_state_machine(id).await {
-                        let mut state_machine = state_machine.lock().await;
-                        state_machine.handle_event(ConnectionEvent::Connect).await;
-                    } else {
-                        // log::debug!("State machine not found");
-                        // ResponseEntity::build_error(SguardError::new(ErrorType::StateMachineError))
-                    };
+                    // log::debug!("State machine id {}", id);
+                    // if let Some(state_machine) = state_machine_manager.get_state_machine(id).await {
+                    //     let mut state_machine = state_machine.lock().await;
+                    //     state_machine.handle_event(ConnectionEvent::Start).await;
+                    // } else {
+                    //     // log::debug!("State machine not found");
+                    //     // ResponseEntity::build_error(SguardError::new(ErrorType::StateMachineError))
+                    // };
                 });
 
                 // Await the response from the channel
