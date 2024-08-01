@@ -4,8 +4,9 @@ members = [ "sguard",
     "sguard-core",
     "sguard-http",
     "sguard",
-    "sguard-filter"
-]
+    "sguard-filter",
+    "sguard-error"
+, "sguard-proxy"]
 
 
 [workspace.dependencies]
