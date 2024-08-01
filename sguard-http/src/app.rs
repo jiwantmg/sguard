@@ -28,7 +28,6 @@ impl AppBuilder {
     }
     pub fn app_builder(&mut self) {
         let csrf_filter = Arc::new(CsrfFilter::new(None));
-
         let auth_filter = Arc::new(AuthFilter::new(Some(Arc::new(SGuardBasicAuthFilter))));
 
         let logging_filter = Arc::new(LoggingFilter::new(None));
