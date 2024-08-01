@@ -12,7 +12,7 @@ impl UpstreamService {
     }
 
     pub async fn call_upstream_service(&self) -> Result<String, hyper::Error> {
-        let uri: String = "http://localhost:3000/".parse().unwrap();
+        let uri: String = "http://localhost:8000/hello.txt".parse().unwrap();
 
         let request = Request::builder()
             .method("GET")

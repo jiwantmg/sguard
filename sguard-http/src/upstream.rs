@@ -1,29 +1,27 @@
 use hyper::{Body, Request, Response};
-use serde::{Deserialize, Serialize};
 use sguard_core::http::ResponseEntity;
 use sguard_error::{Error as SguardError, ErrorType};
 use sguard_filter::core::FilterFn;
-use sguard_proxy::state_machine::{ConnectionEvent, StateMachineManager};
+use sguard_proxy::state_machine::StateMachineManager;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::oneshot;
 
 pub struct UpstreamService {
     state_machine_manager: Arc<StateMachineManager>,
 }
 
 impl UpstreamService {
-    pub fn new() -> Self {
+    pub fn new(state_manager: Arc<StateMachineManager>) -> Self {
         log::debug!("Creating state machine manager");
         UpstreamService {
-            state_machine_manager: Arc::new(StateMachineManager::new()),
+            state_machine_manager: state_manager,
         }
     }
 
     pub fn create_handler(&self) -> FilterFn {
         let state_machine_manager = self.state_machine_manager.clone();
-
         // Update closure to take a reference to Request
         let handler: FilterFn = Arc::new(move |req: &Request<Body>| {
             let state_machine_manager = state_machine_manager.clone();
@@ -34,7 +32,7 @@ impl UpstreamService {
             new_request
                 .headers_mut()
                 .extend(req.headers().iter().map(|(k, v)| (k.clone(), v.clone())));
-            let req_new = Arc::new(Mutex::new(new_request));
+            let req_new = Arc::new(new_request);
 
             let response_future: Pin<
                 Box<dyn Future<Output = Result<Response<Body>, Box<sguard_error::Error>>> + Send>,
