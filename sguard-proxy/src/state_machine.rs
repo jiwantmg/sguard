@@ -26,7 +26,7 @@ pub enum ConnectionEvent {
 
 pub struct StateMachine {
     state: State,
-    req: Arc<Mutex<Request<Body>>>,
+    req: Arc<Request<Body>>,
     tx: mpsc::Sender<ConnectionEvent>,
     rx: mpsc::Receiver<ConnectionEvent>,
     on_completed: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
@@ -35,7 +35,7 @@ pub struct StateMachine {
 
 impl StateMachine {
     pub fn new(
-        req: Arc<Mutex<Request<Body>>>,
+        req: Arc<Request<Body>>,
         tx: mpsc::Sender<ConnectionEvent>,
         rx: mpsc::Receiver<ConnectionEvent>,
         on_completed: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
@@ -65,8 +65,7 @@ impl StateMachine {
             State::Idle => match event {
                 ConnectionEvent::Start => {
                     log::debug!("Transitioning from Idle to Starting");
-                    let request = self.req.lock().await;
-                    match request.method() {
+                    match self.req.method() {
                         &Method::GET => {
                             self.state = State::Starting;
                             self.tx.send(ConnectionEvent::Receive).await.unwrap()
@@ -140,23 +139,21 @@ impl StateMachine {
 }
 
 pub struct StateMachineManager {
-    state_machines: Mutex<HashMap<usize, Arc<Mutex<StateMachine>>>>,
     next_id: Mutex<usize>,
 }
 
 impl StateMachineManager {
     pub fn new() -> Self {
         Self {
-            state_machines: Mutex::new(HashMap::new()),
             next_id: Mutex::new(0), // Initialize notify
         }
     }
 
     pub async fn create_state_machine(
         &self,
-        req: Arc<Mutex<Request<Body>>>,
+        req: Arc<Request<Body>>,
         response_handler: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
-    ) -> usize {
+    ) -> Arc<Mutex<StateMachine>> {
         let (tx, rx) = mpsc::channel(10000);
         let mut next_id = self.next_id.lock().await;
         let id = *next_id;
@@ -164,24 +161,15 @@ impl StateMachineManager {
         let req = req;
         let state_machine = Arc::new(Mutex::new(StateMachine::new(req, tx, rx, response_handler)));
         let sm_clone = state_machine.clone();
-        let mut state_machines_clone = self.state_machines.lock().await.clone();
         tokio::spawn(async move {
             let mut state_machine = sm_clone.lock().await;
             log::debug!("State machine starting running {}", id);
             state_machine.handle_event(ConnectionEvent::Start).await;
             state_machine.run().await;
             log::debug!("State machine done {}", id);
-            state_machines_clone.remove(&id);
         });
 
-        let mut state_machines = self.state_machines.lock().await;
-        state_machines.insert(id, state_machine);
         log::debug!("Inserting state machine {}", id);
-        id
-    }
-
-    pub async fn get_state_machine(&self, id: usize) -> Option<Arc<Mutex<StateMachine>>> {
-        let state_machines = self.state_machines.lock().await;
-        state_machines.get(&id).cloned()
+        state_machine.clone()
     }
 }
