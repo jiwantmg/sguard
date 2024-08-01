@@ -157,7 +157,7 @@ impl StateMachineManager {
         req: Arc<Mutex<Request<Body>>>,
         response_handler: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
     ) -> usize {
-        let (tx, rx) = mpsc::channel(100);
+        let (tx, rx) = mpsc::channel(10000);
         let mut next_id = self.next_id.lock().await;
         let id = *next_id;
         *next_id += 1;
