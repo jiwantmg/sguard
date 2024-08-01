@@ -1,4 +1,133 @@
 routes:
-  id: user-srevice
-  url: http://localhost:3000
-  pattern: api/user/*
+  # Route Mapping
+  - id: lb-user-service
+    uri: http://user-service:9001
+    predicates:
+      - Path=/user/api/**
+
+  # billing section
+  - id: lb-billing-service
+    uri: http://billing-service:5000
+    predicates:
+      - Path=/billing/api/**
+  #          filters:
+  #            - name: AuthFilter
+
+  # billing section
+  - id: lb-purchase-service
+    uri: http://purchase-service:5000
+    predicates:
+      - Path=/purchase/api/**
+  #          filters:
+  #            - name: AuthFilter
+
+  ## preference service
+  - id: lb-preference-service
+    uri: http://preference-service:5000
+    predicates:
+      - Path=/preference/api/**
+
+  ## contact service
+  - id: lb-contact-service
+    uri: http://contact-service:5000
+    predicates:
+      - Path=/contact/api/**
+
+  ## inventory section
+  - id: lb-unit-service
+    uri: http://unit-service:5000
+    predicates:
+      - Path=/inventory/api/units/**
+
+  - id: lb-inventory-service
+    uri: http://inventory-service:5000
+    predicates:
+      - Path=/inventory/api/**
+
+  ## website section
+  - id: lb-web-service
+    uri: http://web-service:5000
+    predicates:
+      - Path=/web/api/**
+  #          filters:
+  #            - name: AuthFilter
+
+  ## account service section
+  - id: lb-account-service
+    uri: http://account-service:5000
+    predicates:
+      - Path=/account/api/**
+  #          filters:
+  #            - name: AuthFilter
+
+  ## Document
+  - id: lb-document-service
+    uri: http://doc-service:8091
+    predicates:
+      - Path=/document/api/**
+  #          filters:
+  #            - name: AuthFilter
+
+  ## Marketplace
+  - id: lb-marketplace-service
+    uri: http://marketplace-service:5000
+    predicates:
+      - Path=/marketplace/api/**
+  #          filters:
+  #            - name: AuthFilter
+
+  ## Handle websocket
+  - id: team-service
+    uri: http://team-service:5000
+    predicates:
+      - Path=/updates/**,/team/api/teams/**
+
+  ## Handle POS
+  - id: pos-service
+    ##uri: http://pos-service:5197
+    uri: http://pos-service:5000
+    predicates:
+      - Path=/pos/api/**
+
+  ### Admin
+  - id: lb-admin-service
+    uri: http://admin-service:5000
+    predicates:
+      - Path=/admin/api/**
+
+  - id: chat-service
+    uri: http://chat-service:5000
+    predicates:
+      - Path=/chat/api/chats/**
+
+  - id: calendar-api
+    uri: http://host.docker.internal:9091
+    predicates:
+      - Path=/calendar/api/**
+
+  - id: calendar-ui
+    uri: http://host.docker.internal:4200
+    predicates:
+      - Path=/calendar/**
+    filters:
+      - RewritePath=/calendar/(?<segment>.*), /$\{segment}
+
+  # - id: team-ui
+  #   uri: http://host.docker.internal:5009
+  #   predicates:
+  #     - Path=/team/**
+  #   filters:
+  #     - RewritePath=/team/(?<segment>.*), /$\{segment}
+
+  - id: default
+    uri: http://frontend
+    predicates:
+      - Path=/**,/#/**
+    filters:
+      - name: Retry
+        args:
+          retries: 3
+          method: GET
+          backoff:
+            firstBackOff: 50ms
+            maxBackOff: 500ms
