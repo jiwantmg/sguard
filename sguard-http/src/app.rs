@@ -1,17 +1,18 @@
 use hyper::service::{make_service_fn, service_fn};
 use hyper::Server;
+use sguard_core::filter::Filter;
 use sguard_error::Error;
 use sguard_filter::auth::basic::SGuardBasicAuthFilter;
 use sguard_filter::auth::AuthFilter;
-use sguard_filter::core::Filter;
 use sguard_filter::exception::ExceptionTranslationFilter;
 use sguard_filter::filter_chain::FilterChain;
 use sguard_filter::http::HeaderWriterFilter;
 use sguard_filter::logging::LoggingFilter;
-use sguard_filter::routing::RoutingFilter;
+use sguard_filter::routing::BaseRoutingFilter;
 use sguard_filter::security::CsrfFilter;
 use sguard_filter::session::SessionManagementFilter;
 use sguard_proxy::state_machine::StateMachineManager;
+use sguard_routing::filter::RoutingFilter;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -37,7 +38,9 @@ impl AppBuilder {
         let session_management_filter = Arc::new(SessionManagementFilter::new(None));
         let exception_translation_filter = Arc::new(ExceptionTranslationFilter::new(None));
         let header_writer_filter = Arc::new(HeaderWriterFilter::new(None));
-        let routing_filter = Arc::new(RoutingFilter::new());
+        let routing_filter = Arc::new(RoutingFilter::new("routes.yaml"));
+        routing_filter.configure_routes();
+        let routing_filter = Arc::new(BaseRoutingFilter::new(Some(routing_filter)));
         self.filter_chain = Arc::new(Mutex::new(FilterChain::new(vec![
             csrf_filter,
             auth_filter,

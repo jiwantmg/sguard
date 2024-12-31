@@ -1,7 +1,7 @@
 use hyper::{Body, Request, Response};
+use sguard_core::filter::FilterFn;
 use sguard_core::http::ResponseEntity;
 use sguard_error::{Error as SguardError, ErrorType};
-use sguard_filter::core::FilterFn;
 use sguard_proxy::state_machine::StateMachineManager;
 use std::future::Future;
 use std::pin::Pin;

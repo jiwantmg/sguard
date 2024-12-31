@@ -9,7 +9,7 @@ routes:
   - id: lb-billing-service
     uri: http://billing-service:5000
     predicates:
-      - Path=/billing/api/**
+      - Host=/billing/api/**
   #          filters:
   #            - name: AuthFilter
 
@@ -17,7 +17,7 @@ routes:
   - id: lb-purchase-service
     uri: http://purchase-service:5000
     predicates:
-      - Path=/purchase/api/**
+      - Query=/purchase/api/**
   #          filters:
   #            - name: AuthFilter
 
@@ -25,7 +25,7 @@ routes:
   - id: lb-preference-service
     uri: http://preference-service:5000
     predicates:
-      - Path=/preference/api/**
+      - Regex=/preference/api/**
 
   ## contact service
   - id: lb-contact-service
@@ -109,8 +109,8 @@ routes:
     uri: http://host.docker.internal:4200
     predicates:
       - Path=/calendar/**
-    filters:
-      - RewritePath=/calendar/(?<segment>.*), /$\{segment}
+    # filters:
+    #   - RewritePath=/calendar/(?<segment>.*), /$\{segment}
 
   # - id: team-ui
   #   uri: http://host.docker.internal:5009
@@ -118,16 +118,15 @@ routes:
   #     - Path=/team/**
   #   filters:
   #     - RewritePath=/team/(?<segment>.*), /$\{segment}
-
   - id: default
     uri: http://frontend
     predicates:
       - Path=/**,/#/**
-    filters:
-      - name: Retry
-        args:
-          retries: 3
-          method: GET
-          backoff:
-            firstBackOff: 50ms
-            maxBackOff: 500ms
+    # filters:
+    #   - name: Retry
+    #     args:
+    #       retries: 3
+    #       method: GET
+    #       backoff:
+    #         firstBackOff: 50ms
+    #         maxBackOff: 500ms

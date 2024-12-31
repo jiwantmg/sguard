@@ -5,3 +5,9 @@ edition = "2021"
 
 [dependencies]
 log = { workspace = true }
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+hyper = { workspace = true }
+sguard-core = { version = "0.1.0", path = "../sguard-core", default-features = false }
+sguard-filter = { version = "0.1.0", path = "../sguard-filter", default-features = false }
+path-matchers = { workspace = true }

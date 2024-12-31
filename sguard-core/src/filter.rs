@@ -10,9 +10,6 @@ pub trait Filter: Send + Sync {
     fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs;
 }
 
-/// FilterFn is a signature type, instead of writing long type definition for
-/// function, we can simply use
-/// fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs
 pub type FilterFn = Arc<
     dyn Fn(
             &Request<Body>,

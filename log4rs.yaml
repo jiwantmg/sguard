@@ -12,14 +12,14 @@ appenders:
       pattern: "{d} - {l} - {m}\n"
 
 root:
-  level: info
+  level: debug
   appenders:
     - stdout
     - file
 
 loggers:
   my_crate:
-    level: info
+    level: debug
     appenders:
       - stdout
       # - file

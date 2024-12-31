@@ -3,9 +3,9 @@ pub mod ldap;
 pub mod oauth2;
 pub mod saml;
 
-use crate::core::{Filter, FilterFn, FilterRs};
 use crate::filter_chain::FilterChainTrait;
 use hyper::{Body, Request};
+use sguard_core::filter::{Filter, FilterFn, FilterRs};
 use std::sync::Arc;
 
 pub trait AuthFilterTrait: FilterChainTrait {

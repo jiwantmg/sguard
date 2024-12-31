@@ -1,5 +1,5 @@
-use crate::core::{Filter, FilterFn, FilterRs};
 use hyper::{Body, Request};
+use sguard_core::filter::{Filter, FilterFn, FilterRs};
 use std::sync::Arc;
 
 pub trait FilterChainTrait: Filter {}
