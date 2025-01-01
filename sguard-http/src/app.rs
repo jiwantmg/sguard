@@ -15,20 +15,20 @@ use sguard_filter::security::CsrfFilter;
 use sguard_filter::session::SessionManagementFilter;
 use sguard_proxy::state_machine::StateMachineManager;
 use sguard_routing::filter::RoutingFilter;
-use std::sync::{Arc, RwLock};
-use tokio::sync::Mutex;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use crate::upstream::UpstreamService;
 
 pub struct AppBuilder {
-    filter_chain: Arc<Mutex<FilterChain>>,
+    filter_chain: Arc<RwLock<FilterChain>>,
     upstream_service: UpstreamService,
 }
 
 impl AppBuilder {
     pub fn new() -> Self {
         Self {
-            filter_chain: Arc::new(Mutex::new(FilterChain::new(vec![]))),
+            filter_chain: Arc::new(RwLock::new(FilterChain::new(vec![]))),
             upstream_service: UpstreamService::new(Arc::new(StateMachineManager::new())),
         }
     }
@@ -46,7 +46,7 @@ impl AppBuilder {
         let routing_filter_mut = Arc::from(routing_filter);
         let routing_filter = Arc::new(BaseRoutingFilter::new(Some(routing_filter_mut)));
 
-        self.filter_chain = Arc::new(Mutex::new(FilterChain::new(vec![
+        self.filter_chain = Arc::new(RwLock::new(FilterChain::new(vec![
             csrf_filter,
             auth_filter,
             logging_filter,
@@ -69,7 +69,7 @@ impl AppBuilder {
                     let filter_chain = filter_chain.clone();
                     let state_machine_handler = state_machine_handler.clone();
                     async move {
-                        let filter_chain = filter_chain.lock().await;
+                        let filter_chain = filter_chain.read().await;
                         let result = filter_chain.handle(&mut RequestContext{
                                                         request: req,
                                                         route_definition: RouteDefinition{
