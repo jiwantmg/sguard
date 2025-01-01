@@ -22,7 +22,6 @@ impl RoutingFilter {
         
         // Iterate over the routes in config and build route definitions
         for route in &self.config.routes {
-            println!("Route {}", route.id);
             for predicate in &route.predicates {
                 let path_array: Vec<&str> = predicate.split("=").collect();
                 if path_array.len() >= 2 {

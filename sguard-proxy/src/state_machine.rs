@@ -85,17 +85,17 @@ impl StateMachine {
             },
             State::Starting => match event {
                 ConnectionEvent::Send => {
-                    log::debug!("Transitioning from Connecting to Sending");
+                    log::trace!("Transitioning from Connecting to Sending");
                     self.state = State::Sending;
-                    log::debug!("Sending request to upstream {}", self.req.route_definition.id);
+                    log::trace!("Sending request to upstream {}", self.req.route_definition.id);
                     self.tx.send(ConnectionEvent::Receive).await.unwrap();
                 }
                 ConnectionEvent::Receive => {
                     log::trace!("Transitioning from Sending to Receiving");
                     self.state = State::Receiving;
-                    log::debug!("Get From {}", self.req.route_definition.id);
+                    log::trace!("Get From {}", self.req.route_definition.id);
 
-                    log::debug!("Calling upstream service for {}", self.req.route_definition.id);
+                    log::trace!("Calling upstream service for {}", self.req.route_definition.id);
                     let response = self.upstream_service.call_upstream_service().await;
 
                     match response {
@@ -114,7 +114,7 @@ impl StateMachine {
                     self.tx.send(ConnectionEvent::Complete).await.unwrap();
                 }
                 ConnectionEvent::Fail => {
-                    log::debug!("Transitioning from Connecting to Error");
+                    log::trace!("Transitioning from Connecting to Error");
                     self.state = State::Error;
                 }
                 _ => log::error!("Unhandled event in Connecting state"),
@@ -122,14 +122,14 @@ impl StateMachine {
             State::Sending => match event {
                 ConnectionEvent::Receive => {}
                 ConnectionEvent::Fail => {
-                    log::debug!("Transitioning from Sending to Error");
+                    log::trace!("Transitioning from Sending to Error");
                     self.state = State::Error;
                 }
                 _ => log::error!("Unhandled event in Sending state"),
             },
             State::Receiving => match event {
                 ConnectionEvent::Complete => {
-                    log::debug!("Transitioning from Receiving to Completed");
+                    log::trace!("Transitioning from Receiving to Completed");
                     self.state = State::Completed;
                     // Callback logic moved here
                     if let Some(callback) = self.on_completed.take() {
@@ -147,7 +147,7 @@ impl StateMachine {
                 _ => log::error!("Unhandled event in Receiving state"),
             },
             State::Completed | State::Error => {
-                log::debug!("Final state reached");
+                log::trace!("Final state reached");
             }
             _ => log::error!("Unhandled event in state: {:?}", event),
         }
@@ -179,13 +179,13 @@ impl StateMachineManager {
         let sm_clone = state_machine.clone();
         tokio::spawn(async move {
             let mut state_machine = sm_clone.lock().await;
-            log::debug!("State machine starting running {}", id);
+            log::trace!("State machine starting running {}", id);
             state_machine.handle_event(ConnectionEvent::Start).await;
             state_machine.run().await;
-            log::debug!("State machine done {}", id);
+            log::trace!("State machine done {}", id);
         });
 
-        log::debug!("Inserting state machine {}", id);
+        log::trace!("Inserting state machine {}", id);
         state_machine.clone()
     }
 }
