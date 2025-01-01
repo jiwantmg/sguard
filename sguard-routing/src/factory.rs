@@ -1,10 +1,11 @@
+use sguard_core::model::route::{Route, RouteDefinition};
+
 use crate::resolver::cookie_based_resolver::CookieBasedResolver;
 use crate::resolver::host_based_resolver::HostBasedResolver;
 use crate::resolver::path_based_resolver::PathBasedResolver;
 use crate::resolver::query_based_resolver::QueryBasedResolver;
 
 use crate::resolver::regex_based_resolver::RegexBasedResolver;
-use crate::route::{Route, RouteDefinition};
 pub trait RouteResolver {
     fn resolve(&self, config: &Route) -> RouteDefinition;
 }

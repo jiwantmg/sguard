@@ -1,9 +1,6 @@
 use std::sync::Arc;
-
-use hyper::{Body, Request};
-
 use crate::filter_chain::FilterChainTrait;
-use sguard_core::filter::{Filter, FilterFn, FilterRs};
+use sguard_core::{filter::{Filter, FilterFn, FilterRs}, model::context::RequestContext};
 
 // test commit test commit
 pub trait RoutingFilterTrait: FilterChainTrait {
@@ -20,17 +17,17 @@ impl BaseRoutingFilter {
     }
 }
 impl Filter for BaseRoutingFilter {
-    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
+    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
         log::debug!("Filter: Base Routing");
         // Perform authentication logic here
         let current_next = next.clone();
         if let Some(chain) = &self.sub_chain {
-            let chain_handler = Arc::new(Box::new(move |req: &Request<Body>| {
+            let chain_handler = Arc::new(Box::new(move |req: &mut RequestContext| {
                 // Handle the request using the chain
                 let current_next = current_next.clone();
                 chain.handle(req, current_next)
             }));
-            let req_child = &req;
+            let req_child = req;
             // Use the `chain_handler` here
             return chain_handler(req_child);
         }

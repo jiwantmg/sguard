@@ -1,41 +1,52 @@
-use hyper::{Body, Request};
-use sguard_core::filter::{Filter, FilterFn, FilterRs};
+use sguard_core::{filter::{Filter, FilterFn, FilterRs}, model::{context::RequestContext, route::{Config, RouteDefinition}}};
 use sguard_filter::{filter_chain::FilterChainTrait, routing::RoutingFilterTrait};
 use std::sync::Arc;
-
-use crate::route::{load_config, Config};
-use crate::factory::{RouteResolverFactory, RouteResolverType};
+use crate::{factory::RouteResolverFactory, route::load_config};
 
 pub struct RoutingFilter {
     config: Config,
+    routing_definitions: Vec<RouteDefinition>
 }
 
 impl RoutingFilter {
     pub fn new(file_path: &str) -> Self {
         let routing_filter = RoutingFilter {
             config: load_config(&file_path),
+            routing_definitions: vec![]
         };
-
         routing_filter
     }
 
-    pub fn configure_routes(&self) {
+    pub fn configure_routes(&mut self) {
+        let mut route_definitions = Vec::new();
+        
+        // Iterate over the routes in config and build route definitions
         for route in &self.config.routes {
             println!("Route {}", route.id);
             for predicate in &route.predicates {
                 let path_array: Vec<&str> = predicate.split("=").collect();
                 if path_array.len() >= 2 {
                     let resolver = RouteResolverFactory::get_route_resolver_by_predicate(path_array[0]);
-                    resolver.resolve(route);
-                }                    
+                    // Push the resolved route to the new vector
+                    route_definitions.push(resolver.resolve(route));
+                }
             }
         }
+
+        // Update routing_definitions with the new list of resolved routes
+        self.routing_definitions = route_definitions;
     }
 }
 
 impl Filter for RoutingFilter {
-    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
-        log::debug!("Sub routing filter trait");
+    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
+        log::debug!("Find appropriate route match");
+        for route_def in self.routing_definitions.clone() {
+            if route_def.predicates.get(0).map(String::as_str) == Some(req.request.uri().path()) {
+                req.set_route_definition(route_def);
+                return next(req)
+            }
+        }
         // Perform authentication logic here
         next(req)
     }

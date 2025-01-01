@@ -1,6 +1,5 @@
 use crate::filter_chain::FilterChainTrait;
-use hyper::{Body, Request};
-use sguard_core::filter::{Filter, FilterFn, FilterRs};
+use sguard_core::{filter::{Filter, FilterFn, FilterRs}, model::context::RequestContext};
 use sguard_error::ErrorType;
 use std::sync::Arc;
 
@@ -20,7 +19,7 @@ impl CsrfFilter {
 pub const ERR_INVALID_CSRF: ErrorType = ErrorType::Custom("INVALID CSRF");
 
 impl Filter for CsrfFilter {
-    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
+    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
         log::debug!("Filter: CsrfFilter");
         // Perform authentication logic here
         //let mut current_next = next.clone();

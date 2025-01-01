@@ -1,4 +1,6 @@
-use crate::{factory::RouteResolver, route::{Route, RouteDefinition}};
+use sguard_core::model::route::{Route, RouteDefinition};
+
+use crate::factory::RouteResolver;
 
 pub struct CookieBasedResolver {}
 

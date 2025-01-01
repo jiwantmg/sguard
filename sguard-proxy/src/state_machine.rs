@@ -1,8 +1,8 @@
 use crate::upstream::UpstreamService;
-use hyper::{Body, Method, Request, Response};
-use sguard_core::http::ResponseEntity;
+use hyper::{Body, Method, Response};
+use sguard_core::{http::ResponseEntity, model::context::RequestContext};
 use sguard_error::Error;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ pub enum ConnectionEvent {
 
 pub struct StateMachine {
     state: State,
-    req: Arc<Request<Body>>,
+    req: Arc<RequestContext>,
     tx: mpsc::Sender<ConnectionEvent>,
     rx: mpsc::Receiver<ConnectionEvent>,
     on_completed: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
@@ -35,7 +35,7 @@ pub struct StateMachine {
 
 impl StateMachine {
     pub fn new(
-        req: Arc<Request<Body>>,
+        req: Arc<RequestContext>,
         tx: mpsc::Sender<ConnectionEvent>,
         rx: mpsc::Receiver<ConnectionEvent>,
         on_completed: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
@@ -64,8 +64,8 @@ impl StateMachine {
         match self.state {
             State::Idle => match event {
                 ConnectionEvent::Start => {
-                    log::debug!("Transitioning from Idle to Starting");
-                    match self.req.method() {
+                    log::debug!("Transitioning from Idle to Starting {}", self.req.request.method());                    
+                    match self.req.request.method() {
                         &Method::GET => {
                             self.state = State::Starting;
                             self.tx.send(ConnectionEvent::Receive).await.unwrap()
@@ -85,11 +85,13 @@ impl StateMachine {
                 ConnectionEvent::Send => {
                     log::debug!("Transitioning from Connecting to Sending");
                     self.state = State::Sending;
+                    log::debug!("Sending request to upstream {}", self.req.route_definition.id);
                     self.tx.send(ConnectionEvent::Receive).await.unwrap();
                 }
                 ConnectionEvent::Receive => {
                     log::debug!("Transitioning from Sending to Receiving");
                     self.state = State::Receiving;
+                    log::debug!("Get From {}", self.req.route_definition.id);
                     self.tx.send(ConnectionEvent::Complete).await.unwrap();
                 }
                 ConnectionEvent::Fail => {
@@ -151,7 +153,7 @@ impl StateMachineManager {
 
     pub async fn create_state_machine(
         &self,
-        req: Arc<Request<Body>>,
+        req: Arc<RequestContext>,
         response_handler: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
     ) -> Arc<Mutex<StateMachine>> {
         let (tx, rx) = mpsc::channel(10000);

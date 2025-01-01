@@ -1,13 +1,12 @@
 use crate::filter_chain::FilterChainTrait;
-use hyper::{Body, Request};
-use sguard_core::filter::{Filter, FilterFn, FilterRs};
+use sguard_core::{filter::{Filter, FilterFn, FilterRs}, model::context::RequestContext};
 use std::sync::Arc;
 
 use super::AuthFilterTrait;
 pub struct SGuardBasicAuthFilter;
 
 impl Filter for SGuardBasicAuthFilter {
-    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
+    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
         log::debug!("Filter: Basic AuthFilter");
         // Perform authentication logic here
         next(req)

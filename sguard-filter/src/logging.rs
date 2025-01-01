@@ -1,6 +1,5 @@
 use crate::filter_chain::FilterChainTrait;
-use hyper::{Body, Request};
-use sguard_core::filter::{Filter, FilterFn, FilterRs};
+use sguard_core::{filter::{Filter, FilterFn, FilterRs}, model::context::RequestContext};
 use std::sync::Arc;
 
 pub trait LoggingFilterTrait: FilterChainTrait {
@@ -17,8 +16,8 @@ impl LoggingFilter {
 }
 
 impl Filter for LoggingFilter {
-    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
-        log::debug!("Filter: LoggingFilter, PATH: {}", req.uri());
+    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
+        log::debug!("Filter: LoggingFilter, PATH: {}", req.request.uri());
         next(req)
     }
 }

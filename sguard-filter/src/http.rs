@@ -1,9 +1,6 @@
 use std::sync::Arc;
-
-use hyper::{Body, Request};
-
 use crate::filter_chain::FilterChainTrait;
-use sguard_core::filter::{Filter, FilterFn, FilterRs};
+use sguard_core::{filter::{Filter, FilterFn, FilterRs}, model::context::RequestContext};
 
 pub trait HeaderWriterFilterTrait: FilterChainTrait {
     fn sub_filter_chain(&self) -> Option<Arc<dyn HeaderWriterFilterTrait>>;
@@ -18,7 +15,7 @@ impl HeaderWriterFilter {
     }
 }
 impl Filter for HeaderWriterFilter {
-    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
+    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
         log::debug!("Filter: HeaderWriterFilter");
         next(req)
     }
