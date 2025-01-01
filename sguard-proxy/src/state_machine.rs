@@ -31,6 +31,7 @@ pub struct StateMachine {
     rx: mpsc::Receiver<ConnectionEvent>,
     on_completed: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
     upstream_service: UpstreamService,
+    response: Option<Response<Body>>
 }
 
 impl StateMachine {
@@ -47,6 +48,7 @@ impl StateMachine {
             rx,
             on_completed,
             upstream_service: UpstreamService::new(),
+            response: None
         }
     }
 
@@ -89,9 +91,26 @@ impl StateMachine {
                     self.tx.send(ConnectionEvent::Receive).await.unwrap();
                 }
                 ConnectionEvent::Receive => {
-                    log::debug!("Transitioning from Sending to Receiving");
+                    log::trace!("Transitioning from Sending to Receiving");
                     self.state = State::Receiving;
                     log::debug!("Get From {}", self.req.route_definition.id);
+
+                    log::debug!("Calling upstream service for {}", self.req.route_definition.id);
+                    let response = self.upstream_service.call_upstream_service().await;
+
+                    match response {
+                        Ok(response_body) => {
+                            self.response = Some(ResponseEntity::build_success(Body::from(response_body)));
+                            self.tx.send(ConnectionEvent::Complete).await.unwrap();
+                        }
+                        Err(_) => {
+                            self.response = Some(ResponseEntity::build_error(Error::new(
+                                sguard_error::ErrorType::ConnectError,
+                            )));
+                            self.tx.send(ConnectionEvent::Fail).await.unwrap();
+                        }
+                    }
+
                     self.tx.send(ConnectionEvent::Complete).await.unwrap();
                 }
                 ConnectionEvent::Fail => {
@@ -112,18 +131,13 @@ impl StateMachine {
                 ConnectionEvent::Complete => {
                     log::debug!("Transitioning from Receiving to Completed");
                     self.state = State::Completed;
+                    // Callback logic moved here
                     if let Some(callback) = self.on_completed.take() {
-                        // Call the closure with the response
-                        let response = self.upstream_service.call_upstream_service().await;
-                        match response {
-                            Ok(response) => {
-                                callback(ResponseEntity::build_success(Body::from(response)))
-                            }
-                            Err(_) => callback(ResponseEntity::build_error(Error::new(
-                                sguard_error::ErrorType::ConnectError,
-                            ))),
+                        if let Some(response) = self.response.take() {
+                            callback(response);
+                        } else {
+                            log::error!("No response available for callback");
                         }
-                        self.tx.send(ConnectionEvent::Complete).await.unwrap();
                     }
                 }
                 ConnectionEvent::Fail => {
