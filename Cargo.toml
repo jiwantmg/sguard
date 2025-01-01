@@ -1,19 +1,25 @@
 [workspace]
 resolver = "2"
-members = [ "sguard",
+members = [
+    "sguard",
     "sguard-core",
     "sguard-http",
     "sguard",
     "sguard-filter",
-    "sguard-error"
-, "sguard-proxy"]
+    "sguard-error",
+    "sguard-proxy",
+    "sguard-routing",
+]
 
 
 [workspace.dependencies]
 http = "1.1.0"
 log = "0.4.22"
 log4rs = "1.2"
+regex = "1.10.5"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 serde_yaml = "0.9"
+path-matchers = "1.0.2"
 tokio = { version = "1.38.1", features = ["full"] }
 hyper = { version = "0.14", features = ["full"] }

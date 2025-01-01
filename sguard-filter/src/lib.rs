@@ -1,5 +1,4 @@
 pub mod auth;
-pub mod core;
 pub mod exception;
 pub mod filter_chain;
 pub mod http;

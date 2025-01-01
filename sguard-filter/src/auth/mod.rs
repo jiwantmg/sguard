@@ -3,10 +3,10 @@ pub mod ldap;
 pub mod oauth2;
 pub mod saml;
 
-use crate::core::{Filter, FilterFn, FilterRs};
 use crate::filter_chain::FilterChainTrait;
 use hyper::{Body, Request};
-use std::sync::Arc;
+use sguard_core::{filter::{Filter, FilterFn, FilterRs}, model::context::RequestContext};
+use std::{future::Future, sync::Arc};
 
 pub trait AuthFilterTrait: FilterChainTrait {
     fn sub_filter_chain(&self) -> Option<Arc<dyn AuthFilterTrait>>;
@@ -23,17 +23,17 @@ impl AuthFilter {
 }
 
 impl Filter for AuthFilter {
-    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
+    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
         log::debug!("Filter: AuthFilter");
         // Perform authentication logic here
-        let current_next = next.clone();
+        let current_next: Arc<dyn Fn(&mut RequestContext) -> std::pin::Pin<Box<dyn Future<Output = Result<hyper::Response<Body>, Box<sguard_error::Error>>> + Send>> + Send + Sync> = next.clone();
         if let Some(chain) = &self.sub_chain {
-            let chain_handler = Arc::new(Box::new(move |req: &Request<Body>| {
+            let chain_handler = Arc::new(Box::new(move |req: &mut RequestContext| {
                 // Handle the request using the chain
                 let current_next = current_next.clone();
                 chain.handle(req, current_next)
             }));
-            let req_child = &req;
+            let req_child = req;
             // Use the `chain_handler` here
             return chain_handler(req_child);
         }

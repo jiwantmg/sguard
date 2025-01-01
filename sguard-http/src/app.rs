@@ -1,18 +1,21 @@
 use hyper::service::{make_service_fn, service_fn};
 use hyper::Server;
+use sguard_core::filter::Filter;
+use sguard_core::model::context::RequestContext;
+use sguard_core::model::route::RouteDefinition;
 use sguard_error::Error;
 use sguard_filter::auth::basic::SGuardBasicAuthFilter;
 use sguard_filter::auth::AuthFilter;
-use sguard_filter::core::Filter;
 use sguard_filter::exception::ExceptionTranslationFilter;
 use sguard_filter::filter_chain::FilterChain;
 use sguard_filter::http::HeaderWriterFilter;
 use sguard_filter::logging::LoggingFilter;
-use sguard_filter::routing::RoutingFilter;
+use sguard_filter::routing::BaseRoutingFilter;
 use sguard_filter::security::CsrfFilter;
 use sguard_filter::session::SessionManagementFilter;
 use sguard_proxy::state_machine::StateMachineManager;
-use std::sync::Arc;
+use sguard_routing::filter::RoutingFilter;
+use std::sync::{Arc, RwLock};
 use tokio::sync::Mutex;
 
 use crate::upstream::UpstreamService;
@@ -37,7 +40,12 @@ impl AppBuilder {
         let session_management_filter = Arc::new(SessionManagementFilter::new(None));
         let exception_translation_filter = Arc::new(ExceptionTranslationFilter::new(None));
         let header_writer_filter = Arc::new(HeaderWriterFilter::new(None));
-        let routing_filter = Arc::new(RoutingFilter::new());
+
+        let mut routing_filter =RoutingFilter::new("routes.yaml");
+        routing_filter.configure_routes();
+        let routing_filter_mut = Arc::from(routing_filter);
+        let routing_filter = Arc::new(BaseRoutingFilter::new(Some(routing_filter_mut)));
+
         self.filter_chain = Arc::new(Mutex::new(FilterChain::new(vec![
             csrf_filter,
             auth_filter,
@@ -62,7 +70,16 @@ impl AppBuilder {
                     let state_machine_handler = state_machine_handler.clone();
                     async move {
                         let filter_chain = filter_chain.lock().await;
-                        let result = filter_chain.handle(&req, state_machine_handler).await;
+                        let result = filter_chain.handle(&mut RequestContext{
+                                                        request: req,
+                                                        route_definition: RouteDefinition{
+                                                            id: String::from(""),
+                                                            filters: vec![],
+                                                            predicates: vec![]
+                                                        }
+                                                    }, 
+                                                state_machine_handler
+                                                ).await;
                         match result {
                             Ok(response) => Ok(response),
                             Err(e) => Result::Err(e),

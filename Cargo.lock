@@ -199,6 +199,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40ecd4077b5ae9fd2e9e169b102c6c330d0605168eb0e8bf79952b256dbefffd"
 
 [[package]]
+name = "glob"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
+
+[[package]]
 name = "h2"
 version = "0.3.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -504,6 +510,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "path-matchers"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36cd9b72a47679ec193a5f0229d9ab686b7bd45e1fbc59ccf953c9f3d83f7b2b"
+dependencies = [
+ "glob",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -666,6 +681,7 @@ version = "0.1.0"
 dependencies = [
  "http 1.1.0",
  "hyper",
+ "serde",
  "serde_json",
  "sguard-error",
 ]
@@ -704,6 +720,7 @@ dependencies = [
  "sguard-error",
  "sguard-filter",
  "sguard-proxy",
+ "sguard-routing",
  "tokio",
 ]
 
@@ -718,6 +735,19 @@ dependencies = [
  "sguard-core",
  "sguard-error",
  "tokio",
+]
+
+[[package]]
+name = "sguard-routing"
+version = "0.1.0"
+dependencies = [
+ "hyper",
+ "log",
+ "path-matchers",
+ "serde",
+ "serde_yaml",
+ "sguard-core",
+ "sguard-filter",
 ]
 
 [[package]]
