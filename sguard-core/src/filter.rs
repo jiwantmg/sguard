@@ -15,7 +15,7 @@ pub trait Filter: Send + Sync {
 pub type FilterFn = Arc<
     dyn Fn(
             &mut RequestContext,
-        ) -> Pin<Box<dyn Future<Output = Result<Response<Body>, Box<Error>>> + Send>>
+        ) -> FilterRs
         + Send
         + Sync,
 >;
