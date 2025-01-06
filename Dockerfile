@@ -4,40 +4,31 @@ FROM rust:1.79 AS builder
 # Set the working directory
 WORKDIR /usr/src/app
 
-# Copy the Rust project files into the container
+# Copy the entire project into the container
 COPY . .
 
 # Build the Rust application in release mode
 RUN cargo build --release
 
-# Install GLIBC 2.33
-WORKDIR /tmp
-RUN apt-get update && apt-get install -y \
-    wget bzip2 build-essential gawk bison \
-    && wget http://ftp.gnu.org/gnu/libc/glibc-2.33.tar.gz && \
-    tar -xvzf glibc-2.33.tar.gz && \
-    cd glibc-2.33 && \
-    mkdir build && cd build && \
-    ../configure --prefix=/glibc && \
-    make -j$(nproc) && \
-    make install && \
-    cd /tmp && rm -rf glibc-2.33*
-
 # Stage 2: Runtime
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 # Set the working directory
 WORKDIR /app
 
-# Copy the compiled GLIBC and application binary from the builder stage
-COPY --from=builder /glibc /glibc
+# Install necessary runtime libraries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the compiled binary from the builder stage
 COPY --from=builder /usr/src/app/target/release/sguard /app/sguard
 
-# Update the library path to use the custom GLIBC
-ENV LD_LIBRARY_PATH="/glibc/lib:$LD_LIBRARY_PATH"
+COPY --from=builder /usr/src/app/log4rs.yaml /app/log4rs.yaml
+COPY --from=builder /usr/src/app/routes.yaml /app/routes.yaml
 
 # Expose application port (adjust as necessary)
-EXPOSE 8000
+EXPOSE 8080
 
 # Command to run the application
 CMD ["./sguard"]
