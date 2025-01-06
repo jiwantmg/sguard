@@ -88,7 +88,7 @@ impl AppBuilder {
                 }))
             }
         });
-        let addr = ([127, 0, 0, 1], 8080).into();
+        let addr = ([0, 0, 0, 0], 8080).into();
         let server = Server::bind(&addr).serve(make_svc);
 
         println!("Listening on http://{}", addr);

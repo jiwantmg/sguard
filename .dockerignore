@@ -1,0 +1,31 @@
+# Ignore the target directory
+/target
+
+# Ignore intermediate files and output
+**/*.rs.bk
+**/*.rs~ 
+**/*.o
+**/*.a
+**/*.so
+
+# Ignore git-related files
+.git
+.gitignore
+
+# Ignore local environment files
+*.env
+.env.*
+
+# Ignore IDE/editor configuration files
+.idea
+.vscode
+*.swp
+
+
+# Ignore temporary files and directories
+/tmp
+*.tmp
+*.log
+
+# Ignore Docker-related files (except Dockerfile and docker-compose.yml)
+docker-compose.override.yml
