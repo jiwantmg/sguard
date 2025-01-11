@@ -5,11 +5,6 @@ use crate::factory::RouteResolver;
 pub struct RegexBasedResolver {}
 impl RouteResolver for RegexBasedResolver {
     fn resolve(&self, route: &Route) -> RouteDefinition {
-        log::debug!("Regex basd resolver used");
-        RouteDefinition{
-            id: String::from(route.id.clone()),
-            filters: vec![],
-            predicates: vec![]
-        }   
+        RouteDefinition::from_route(route)  
     }
 }

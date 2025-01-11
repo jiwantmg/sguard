@@ -1,6 +1,6 @@
 use crate::upstream::UpstreamService;
-use hyper::{Body, Method, Response};
-use sguard_core::{http::ResponseEntity, model::context::RequestContext};
+use hyper::{Method, Response};
+use sguard_core::{http::ResponseEntity, model::{context::RequestContext, core::HttpResponse}};
 use sguard_error::Error;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
@@ -29,9 +29,9 @@ pub struct StateMachine {
     req: Arc<RequestContext>,
     tx: mpsc::Sender<ConnectionEvent>,
     rx: mpsc::Receiver<ConnectionEvent>,
-    on_completed: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
+    on_completed: Option<Box<dyn FnOnce(Response<HttpResponse>) + Send>>,
     upstream_service: UpstreamService,
-    response: Option<Response<Body>>
+    response: Option<Response<HttpResponse>>
 }
 
 impl StateMachine {
@@ -39,7 +39,7 @@ impl StateMachine {
         req: Arc<RequestContext>,
         tx: mpsc::Sender<ConnectionEvent>,
         rx: mpsc::Receiver<ConnectionEvent>,
-        on_completed: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
+        on_completed: Option<Box<dyn FnOnce(Response<HttpResponse>) + Send>>,
     ) -> Self {
         Self {
             state: State::Idle,
@@ -47,7 +47,7 @@ impl StateMachine {
             tx,
             rx,
             on_completed,
-            upstream_service: UpstreamService::new(),
+            upstream_service: UpstreamService::default(),
             response: None
         }
     }
@@ -100,7 +100,8 @@ impl StateMachine {
 
                     match response {
                         Ok(response_body) => {
-                            self.response = Some(ResponseEntity::build_success(Body::from(response_body)));
+                            //self.response = Some(ResponseEntity::build_success(HttpResponse::from(response_body)));
+                            self.response = Some(ResponseEntity::build_success(HttpResponse::default()));
                             self.tx.send(ConnectionEvent::Complete).await.unwrap();
                         }
                         Err(_) => {
@@ -168,7 +169,7 @@ impl StateMachineManager {
     pub async fn create_state_machine(
         &self,
         req: Arc<RequestContext>,
-        response_handler: Option<Box<dyn FnOnce(Response<Body>) + Send>>,
+        response_handler: Option<Box<dyn FnOnce(Response<HttpResponse>) + Send>>,
     ) -> Arc<Mutex<StateMachine>> {
         let (tx, rx) = mpsc::channel(10000);
         let mut next_id = self.next_id.lock().await;

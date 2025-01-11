@@ -6,11 +6,6 @@ pub struct CookieBasedResolver {}
 
 impl RouteResolver for CookieBasedResolver {
     fn resolve(&self, route: &Route) -> RouteDefinition {
-        log::debug!("Cookie basd resolver used");
-        RouteDefinition{
-            id: String::from(route.id.clone()),
-            filters: vec![],
-            predicates: vec![]
-        }   
+        RouteDefinition::from_route(route)
     }
 }

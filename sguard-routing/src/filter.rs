@@ -38,10 +38,11 @@ impl RoutingFilter {
 }
 
 impl Filter for RoutingFilter {
-    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
-        log::debug!("Find appropriate route match");
+    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {        
         for route_def in self.routing_definitions.clone() {
-            if route_def.predicates.get(0).map(String::as_str) == Some(req.request.uri().path()) {
+            log::debug!("Route {} match for {}", req.request.uri().path(), route_def.uri);
+            if route_def.uri == req.request.uri().path() {
+                log::debug!("Route {} match for {}", req.request.uri().path(), route_def.uri);
                 req.set_route_definition(route_def);
                 return next(req)
             }
