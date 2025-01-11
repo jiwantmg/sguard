@@ -1,12 +1,10 @@
-use hyper::{Body, Request, Response};
-use sguard_core::filter::FilterFn;
+use http::Response;
+use sguard_core::filter::{FilterFn, FilterRs};
 use sguard_core::http::ResponseEntity;
 use sguard_core::model::context::RequestContext;
-use sguard_core::model::route::RouteDefinition;
+use sguard_core::model::core::{HttpRequest, HttpResponse};
 use sguard_error::{Error as SguardError, ErrorType};
 use sguard_proxy::state_machine::StateMachineManager;
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 
@@ -36,17 +34,15 @@ impl UpstreamService {
             // let req_new = Arc::new(new_request);
             let req_new = Arc::new(RequestContext{
                 route_definition: req.route_definition.clone(),
-                request: hyper::Request::new(Body::empty())
+                request: hyper::Request::new(HttpRequest::default())
             });
 
-            let response_future: Pin<
-                Box<dyn Future<Output = Result<Response<Body>, Box<sguard_error::Error>>> + Send>,
-            > = Box::pin(async move {
+            let response_future: FilterRs = Box::pin(async move {
                 let (tx, rx) = oneshot::channel();
                 let req_arc_clone = req_new.clone();
                 tokio::spawn(async move {
                     // Define the closure that will handle the response
-                    let on_completed = Box::new(|response: Response<Body>| {
+                    let on_completed = Box::new(|response: Response<HttpResponse>| {
                         // Process the response here
                         let _ = tx.send(response);
                     });

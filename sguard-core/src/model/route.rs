@@ -65,11 +65,19 @@ impl RouteBuilder {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct RouteDefinition {
     pub id: String,
-    pub predicates: Vec<String>,
-    pub filters: Vec<String>
+    pub uri: String,
+}
+
+impl RouteDefinition {
+    pub fn from_route(route: &Route) -> Self{
+        RouteDefinition {
+            id: route.id.clone(),
+            uri: String::from(route.uri.clone())
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

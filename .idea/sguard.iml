@@ -8,6 +8,7 @@
       <sourceFolder url="file://$MODULE_DIR$/sguard/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/sguard-error/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/sguard-proxy/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/sguard-routing/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

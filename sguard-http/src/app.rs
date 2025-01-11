@@ -1,9 +1,11 @@
-use hyper::service::{make_service_fn, service_fn};
-use hyper::Server;
-use sguard_core::filter::Filter;
+use http::Request;
+use hyper::service::service_fn;
+use sguard_core::model::core::HttpRequest;
+use std::convert::Infallible;
+use std::net::SocketAddr;
+use tokio::net::TcpListener;
 use sguard_core::model::context::RequestContext;
 use sguard_core::model::route::RouteDefinition;
-use sguard_error::Error;
 use sguard_filter::auth::basic::SGuardBasicAuthFilter;
 use sguard_filter::auth::AuthFilter;
 use sguard_filter::exception::ExceptionTranslationFilter;
@@ -17,8 +19,10 @@ use sguard_proxy::state_machine::StateMachineManager;
 use sguard_routing::filter::RoutingFilter;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-
+use hyper_util::rt::TokioIo;
 use crate::upstream::UpstreamService;
+use sguard_core::filter::Filter;
+use hyper::server::conn::http1;
 
 pub struct AppBuilder {
     filter_chain: Arc<RwLock<FilterChain>>,
@@ -59,42 +63,48 @@ impl AppBuilder {
         log::debug!("Creating upstream service");
     }
 
-    pub async fn run(&self) {
+    
+    pub async fn run(&self) -> Result<Infallible, std::io::Error> {
         let state_machine_handler = self.upstream_service.create_handler();
-        let make_svc = make_service_fn(move |_conn| {
-            let filter_chain = self.filter_chain.clone();
+        // let make_svc = make_service_fn(move |_conn| {
+        let filter_chain = self.filter_chain.clone();
+        //     let state_machine_handler = state_machine_handler.clone();
+        let svc = service_fn(move |req: http::Request<hyper::body::Incoming>| {
+            let filter_chain = filter_chain.clone();
             let state_machine_handler = state_machine_handler.clone();
             async move {
-                Ok::<_, Error>(service_fn(move |req| {
-                    let filter_chain = filter_chain.clone();
-                    let state_machine_handler = state_machine_handler.clone();
-                    async move {
-                        let filter_chain = filter_chain.read().await;
-                        let result = filter_chain.handle(&mut RequestContext{
-                                                        request: req,
-                                                        route_definition: RouteDefinition{
-                                                            id: String::from(""),
-                                                            filters: vec![],
-                                                            predicates: vec![]
-                                                        }
-                                                    }, 
-                                                state_machine_handler
-                                                ).await;
-                        match result {
-                            Ok(response) => Ok(response),
-                            Err(e) => Result::Err(e),
-                        }
-                    }
-                }))
+                let filter_chain = filter_chain.read().await;
+                let http_request = HttpRequest::from_hyper_request(req).await;
+                if http_request.is_err() {
+                    eprintln!("Error processing request");
+                }                
+                let result = filter_chain.handle(&mut RequestContext{
+                                                request: Request::new(http_request.unwrap()),
+                                                route_definition: RouteDefinition::default()
+                                            }, 
+                                        state_machine_handler
+                                        ).await;
+                match result {
+                    Ok(response) => Result::Ok(response),
+                    Err(e) => Result::Err(e),
+                }
             }
         });
-        let addr = ([0, 0, 0, 0], 8080).into();
-        let server = Server::bind(&addr).serve(make_svc);
 
-        println!("Listening on http://{}", addr);
-
-        if let Err(e) = server.await {
-            eprintln!("Server error: {}", e);
+        let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
+        let listener = TcpListener::bind(&addr).await?;
+        println!("HTTP server is running on http://0.0.0.0:8080");
+        loop {
+            let (stream, _) = listener.accept().await?;
+            let io = TokioIo::new(stream);
+            let service = svc.clone();
+            tokio::spawn(async move {
+                // N.B. should use hyper service_fn here, since it's required to be implemented hyper Service trait!
+                let builder: http1::Builder = http1::Builder::new();
+                if let Err(err) = builder.serve_connection(io, service).await {
+                    eprintln!("server error: {}", err);
+                }
+            });
         }
     }
 }

@@ -5,5 +5,5 @@ async fn main() {
     log4rs::init_file("log4rs.yaml", Default::default()).unwrap();
     let mut app = AppBuilder::new();
     app.app_builder();
-    app.run().await;
+    let _ = app.run().await;
 }
