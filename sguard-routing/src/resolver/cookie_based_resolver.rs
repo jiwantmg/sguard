@@ -1,6 +1,6 @@
 use sguard_core::model::route::{Route, RouteDefinition};
 
-use crate::factory::RouteResolver;
+use crate::route::RouteResolver;
 
 pub struct CookieBasedResolver {}
 

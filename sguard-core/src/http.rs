@@ -15,7 +15,7 @@ impl ResponseEntity {
             .body(data)
             .unwrap()
     }
-    pub fn build_error(err: Box<Error>) -> Response<HttpResponse> {
+    pub fn build_error(err: Error) -> Response<HttpResponse> {
         // Optionally, you can use `serde_json` to serialize the error message
         let error_message = json!({
             "error": err.to_string(), // Convert the error to a string representation

@@ -17,7 +17,7 @@ impl LoggingFilter {
 
 impl Filter for LoggingFilter {
     fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
-        log::debug!("Filter: LoggingFilter, PATH: {}", req.request.uri());
+        log::debug!("Filter: LoggingFilter, PATH: {}", req.request.uri);
         next(req)
     }
 }

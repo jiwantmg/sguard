@@ -31,7 +31,7 @@ routes:
   - id: lb-contact-service
     uri: http://contact-service:5000
     predicates:
-      - Path=/contact/api/**
+      - Path=/contact/api
 
   ## inventory section
   - id: lb-unit-service

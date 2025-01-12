@@ -15,14 +15,14 @@ pub struct HttpRequest {
 
 impl HttpRequest {
     pub async fn from_hyper_request(req: Request<Incoming>) -> Result<HttpRequest, hyper::Error> {
-        let req = req;
-        let (parts, body) = req.into_parts(); // Split into parts and body
-        Ok(HttpRequest {
+        let (parts, body) = req.into_parts(); // Split into parts and body 
+        let request = HttpRequest {
             method: parts.method,
             uri: parts.uri,
             headers: parts.headers,
             body: body.collect().await?.to_bytes(),
-        })
+        };
+        Ok(request)
     }
 }
 

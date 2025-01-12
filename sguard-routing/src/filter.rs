@@ -40,9 +40,8 @@ impl RoutingFilter {
 impl Filter for RoutingFilter {
     fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {        
         for route_def in self.routing_definitions.clone() {
-            log::debug!("Route {} match for {}", req.request.uri().path(), route_def.uri);
-            if route_def.uri == req.request.uri().path() {
-                log::debug!("Route {} match for {}", req.request.uri().path(), route_def.uri);
+            log::debug!("Route {} match for {}", req.request.uri, route_def.uri_pattern);
+            if route_def.uri_pattern == req.request.uri.path() {
                 req.set_route_definition(route_def);
                 return next(req)
             }

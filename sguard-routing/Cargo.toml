@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 log = { workspace = true }
+regex = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }
 hyper = { workspace = true }

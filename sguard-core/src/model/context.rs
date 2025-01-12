@@ -4,14 +4,14 @@ use super::route::RouteDefinition;
 
 pub struct  RequestContext {
     pub route_definition: RouteDefinition,
-    pub request: Request<HttpRequest>
+    pub request: HttpRequest
 }
 
 impl RequestContext {
     pub fn new(req: &RequestContext) -> Self {
         Self {
             route_definition: req.route_definition.clone(),
-            request: Request::new(HttpRequest::default()) // Initialize with empty body, fill later
+            request: HttpRequest::default() // Initialize with empty body, fill later
         }
     }
 

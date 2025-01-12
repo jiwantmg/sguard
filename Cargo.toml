@@ -14,7 +14,7 @@ members = [
 
 [workspace.dependencies]
 http = "1.2.0"
-log = "0.4.24"
+log = "0.4.22"
 log4rs = "1.2"
 regex = "1.10.5"
 serde = { version = "1.0.217", features = ["derive"] }
@@ -23,6 +23,7 @@ serde_yaml = "0.9"
 path-matchers = "1.0.2"
 tokio = { version = "1.43.0", features = ["full"] }
 hyper = { version = "1.5.2", features = ["full"] }
+hyper-tls = "0.6.0"
 http-body-util = "0.1.2"
 http-body = "1.0.1"
 hyper-util = { version = "0.1.10", features = ["tokio"] }

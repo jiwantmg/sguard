@@ -34,7 +34,7 @@ impl UpstreamService {
             // let req_new = Arc::new(new_request);
             let req_new = Arc::new(RequestContext{
                 route_definition: req.route_definition.clone(),
-                request: hyper::Request::new(HttpRequest::default())
+                request: HttpRequest::default()
             });
 
             let response_future: FilterRs = Box::pin(async move {

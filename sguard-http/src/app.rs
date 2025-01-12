@@ -1,4 +1,3 @@
-use http::Request;
 use hyper::service::service_fn;
 use sguard_core::model::core::HttpRequest;
 use std::convert::Infallible;
@@ -73,13 +72,13 @@ impl AppBuilder {
             let filter_chain = filter_chain.clone();
             let state_machine_handler = state_machine_handler.clone();
             async move {
-                let filter_chain = filter_chain.read().await;
+                let filter_chain = filter_chain.read().await;                
                 let http_request = HttpRequest::from_hyper_request(req).await;
                 if http_request.is_err() {
                     eprintln!("Error processing request");
                 }                
                 let result = filter_chain.handle(&mut RequestContext{
-                                                request: Request::new(http_request.unwrap()),
+                                                request: http_request.unwrap(),
                                                 route_definition: RouteDefinition::default()
                                             }, 
                                         state_machine_handler
