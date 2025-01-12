@@ -6,9 +6,8 @@ use crate::resolver::path_based_resolver::PathBasedResolver;
 use crate::resolver::query_based_resolver::QueryBasedResolver;
 
 use crate::resolver::regex_based_resolver::RegexBasedResolver;
-pub trait RouteResolver {
-    fn resolve(&self, config: &Route) -> RouteDefinition;
-}
+use crate::route::RouteResolver;
+
 
 pub enum RouteResolverType {
     PathBased(PathBasedResolver),

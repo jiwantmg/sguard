@@ -67,7 +67,11 @@ impl RouteBuilder {
 
 #[derive(Clone, Default)]
 pub struct RouteDefinition {
+    /// Unique identifier for the route.
     pub id: String,
+    /// URL pattern used to match incoming request paths.
+    pub uri_pattern: String,
+    /// Upstream URL where matching requests will be routed.
     pub uri: String,
 }
 
@@ -75,6 +79,7 @@ impl RouteDefinition {
     pub fn from_route(route: &Route) -> Self{
         RouteDefinition {
             id: route.id.clone(),
+            uri_pattern: String::from(route.uri.clone()),
             uri: String::from(route.uri.clone())
         }
     }

@@ -1,6 +1,14 @@
 use std::fs;
 
-use sguard_core::model::route::Config;
+use sguard_core::model::route::{Config, Route, RouteDefinition};
+
+pub trait RouteResolver {
+    fn resolve(&self, config: &Route) -> RouteDefinition;
+}
+
+pub trait PathExtractor {
+    fn extract(&self, route: &Route) -> Option<String>;
+}
 
 pub fn load_config(file_path: &str) -> Config {
     let file_content =

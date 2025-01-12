@@ -66,8 +66,8 @@ impl StateMachine {
         match self.state {
             State::Idle => match event {
                 ConnectionEvent::Start => {
-                    log::debug!("Transitioning from Idle to Starting {}", self.req.request.method());                    
-                    match self.req.request.method() {
+                    log::debug!("Transitioning from Idle to Starting {}", self.req.request.method);                    
+                    match &self.req.request.method {
                         &Method::GET => {
                             self.state = State::Starting;
                             self.tx.send(ConnectionEvent::Receive).await.unwrap()
@@ -96,7 +96,7 @@ impl StateMachine {
                     log::trace!("Get From {}", self.req.route_definition.id);
 
                     log::trace!("Calling upstream service for {}", self.req.route_definition.id);
-                    let response = self.upstream_service.call_upstream_service().await;
+                    let response = self.upstream_service.call_upstream_service(self.req.clone()).await;
 
                     match response {
                         Ok(response_body) => {

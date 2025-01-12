@@ -18,6 +18,37 @@ pub struct Error {
     // pub context: Option<Imm>
 }
 
+impl Error {
+    fn create(
+        etype: ErrorType,
+        esource: ErrorSource,
+        //cause: Option<Box<(dyn ErrorTrait + Send + Sync)>>,
+    ) -> Error {
+        Error {
+            etype,
+            esource,
+            //cause,
+        }
+    }
+
+    fn do_new(e: ErrorType, s: ErrorSource) -> Error {
+        Self::create(e, s)
+    }
+
+    pub fn new(e: ErrorType) -> Error {
+        Self::do_new(e, ErrorSource::Unset)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for Error {}
+impl ErrorTrait for Error {}
+
 #[derive(Debug)]
 pub enum ErrorSource {
     /// The error is caused by the remote server
@@ -140,34 +171,3 @@ impl ErrorType {
         };
     }
 }
-
-impl Error {
-    pub fn create(
-        etype: ErrorType,
-        esource: ErrorSource,
-        //cause: Option<Box<(dyn ErrorTrait + Send + Sync)>>,
-    ) -> BError {
-        Box::new(Error {
-            etype,
-            esource,
-            //cause,
-        })
-    }
-
-    fn do_new(e: ErrorType, s: ErrorSource) -> BError {
-        Self::create(e, s)
-    }
-
-    pub fn new(e: ErrorType) -> BError {
-        Self::do_new(e, ErrorSource::Unset)
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl std::error::Error for Error {}
-impl ErrorTrait for Error {}
