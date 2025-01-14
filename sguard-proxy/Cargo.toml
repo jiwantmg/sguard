@@ -9,6 +9,7 @@ sguard-error = { version = "0.1.0", path = "../sguard-error", default-features =
 log = { workspace = true }
 hyper = { workspace = true }
 hyper-util.workspace = true
+bytes.workspace = true
 hyper-tls.workspace = true
 tokio = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
