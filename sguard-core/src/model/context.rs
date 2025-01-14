@@ -1,4 +1,3 @@
-use hyper::Request;
 use super::core::HttpRequest;
 use super::route::RouteDefinition;
 
@@ -11,21 +10,18 @@ impl RequestContext {
     pub fn new(req: &RequestContext) -> Self {
         Self {
             route_definition: req.route_definition.clone(),
-            request: HttpRequest::default() // Initialize with empty body, fill later
+            request: HttpRequest::new() // Initialize with empty body, fill later
         }
     }
 
-    pub async fn to_request(&self) -> Request<HttpRequest> {
-        let mut req = HttpRequest::default();
-        // let body = self.request.body().clone();
-        //let bytes = to_bytes(body).await.unwrap_or_default();
-        
-        // req.headers_mut().extend(self.request.headers().iter().map(|(k,v)| (k.clone(), v.clone())));
-        // *req.method_mut() = self.request.method().clone();
-        // *req.uri_mut() = self.request.uri().clone();
-        // *req.version_mut() = self.request.version();
-        // *req.body_mut() = Body::from(Body::empty()); 
-        Request::builder().body(req).unwrap()
+    pub fn clone_request(&mut self) -> HttpRequest {   
+        HttpRequest {
+            method: self.request.method.clone(),
+            uri: self.request.uri.clone(),
+            headers: self.request.headers.clone(),
+            incoming: self.request.incoming.take(),
+            parts: self.request.parts.take()
+        }        
      }
 
     pub fn set_route_definition(&mut self, route_def: RouteDefinition) {

@@ -1,9 +1,10 @@
+use crate::upstream::UpstreamService;
+use hyper::server::conn::http1;
 use hyper::service::service_fn;
-use sguard_core::model::core::HttpRequest;
-use std::convert::Infallible;
-use std::net::SocketAddr;
-use tokio::net::TcpListener;
+use hyper_util::rt::TokioIo;
+use sguard_core::filter::Filter;
 use sguard_core::model::context::RequestContext;
+use sguard_core::model::core::HttpRequest;
 use sguard_core::model::route::RouteDefinition;
 use sguard_filter::auth::basic::SGuardBasicAuthFilter;
 use sguard_filter::auth::AuthFilter;
@@ -16,12 +17,11 @@ use sguard_filter::security::CsrfFilter;
 use sguard_filter::session::SessionManagementFilter;
 use sguard_proxy::state_machine::StateMachineManager;
 use sguard_routing::filter::RoutingFilter;
+use std::convert::Infallible;
+use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::net::TcpListener;
 use tokio::sync::RwLock;
-use hyper_util::rt::TokioIo;
-use crate::upstream::UpstreamService;
-use sguard_core::filter::Filter;
-use hyper::server::conn::http1;
 
 pub struct AppBuilder {
     filter_chain: Arc<RwLock<FilterChain>>,
@@ -44,7 +44,7 @@ impl AppBuilder {
         let exception_translation_filter = Arc::new(ExceptionTranslationFilter::new(None));
         let header_writer_filter = Arc::new(HeaderWriterFilter::new(None));
 
-        let mut routing_filter =RoutingFilter::new("routes.yaml");
+        let mut routing_filter = RoutingFilter::new("routes.yaml");
         routing_filter.configure_routes();
         let routing_filter_mut = Arc::from(routing_filter);
         let routing_filter = Arc::new(BaseRoutingFilter::new(Some(routing_filter_mut)));
@@ -62,7 +62,6 @@ impl AppBuilder {
         log::debug!("Creating upstream service");
     }
 
-    
     pub async fn run(&self) -> Result<Infallible, std::io::Error> {
         let state_machine_handler = self.upstream_service.create_handler();
         // let make_svc = make_service_fn(move |_conn| {
@@ -72,21 +71,20 @@ impl AppBuilder {
             let filter_chain = filter_chain.clone();
             let state_machine_handler = state_machine_handler.clone();
             async move {
-                let filter_chain = filter_chain.read().await;                
+                let filter_chain = filter_chain.read().await;
                 let http_request = HttpRequest::from_hyper_request(req).await;
                 if http_request.is_err() {
                     eprintln!("Error processing request");
-                }                
-                let result = filter_chain.handle(&mut RequestContext{
-                                                request: http_request.unwrap(),
-                                                route_definition: RouteDefinition::default()
-                                            }, 
-                                        state_machine_handler
-                                        ).await;
-                match result {
-                    Ok(response) => Result::Ok(response),
-                    Err(e) => Result::Err(e),
                 }
+                filter_chain
+                    .handle(
+                        &mut RequestContext {
+                            request: http_request.unwrap(),
+                            route_definition: RouteDefinition::default(),
+                        },
+                        state_machine_handler,
+                    )
+                    .await
             }
         });
 

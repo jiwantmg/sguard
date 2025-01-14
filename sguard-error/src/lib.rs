@@ -46,6 +46,27 @@ impl fmt::Display for Error {
     }
 }
 
+impl From<std::io::Error> for Error {
+    fn from(error: std::io::Error) -> Self {
+        // Convert the IO error to your custom error type
+        Error::new(ErrorType::Custom("Standard IO Error"))
+    }
+}
+
+impl From<hyper::Error> for Error {
+    fn from(err: hyper::Error) -> Self {
+        Error::new(ErrorType::Custom("Hyper IO Error"))
+    }
+}
+
+impl From<tokio::time::error::Elapsed> for Error {
+    fn from(_: tokio::time::error::Elapsed) -> Self {
+        Error::new(
+           ErrorType::ConnectTimeout
+        )
+    }
+}
+
 impl std::error::Error for Error {}
 impl ErrorTrait for Error {}
 
@@ -104,7 +125,7 @@ pub enum ErrorType {
     Custom(&'static str),
     /// Custom error with static string and code.
     /// this field allows users to extend error further with error codes.
-    CustomCode(&'static str, u16),
+    CustomCode(&'static str, u16)
 }
 
 impl ErrorType {

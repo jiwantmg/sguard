@@ -1,7 +1,7 @@
 routes:
   # Route Mapping
   - id: lb-user-service
-    uri: https://google.com
+    uri: http://127.0.0.1:8090
     predicates:
       - Path=/user/api
 
