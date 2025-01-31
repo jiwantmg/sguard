@@ -7,3 +7,5 @@ edition = "2021"
 http = { workspace = true }
 hyper = { workspace = true }
 tokio = { workspace = true }
+bytes = { workspace = true}
+http-body-util = { workspace = true }

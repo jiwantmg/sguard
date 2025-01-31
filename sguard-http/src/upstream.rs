@@ -1,6 +1,6 @@
 use http::Response;
 use hyper::body::Incoming;
-use sguard_core::filter::{FilterFn, FilterRs};
+use sguard_core::filter::{FilterFn, FilterRs, ResponseBody};
 use sguard_core::model::context::RequestContext;
 use sguard_error::{Error as SguardError, ErrorType};
 use sguard_proxy::state_machine::StateMachineManager;
@@ -51,7 +51,7 @@ impl UpstreamService {
 
                 // Await the response from the channel
                 match rx.await {
-                    Ok(result) => Ok(result),
+                    Ok(result) => Ok(Response::new(ResponseBody::Incoming(result))),
                     Err(_) => Err(SguardError::new(ErrorType::ReadError)),
                 }
             });

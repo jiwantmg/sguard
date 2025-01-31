@@ -1,0 +1,13 @@
+[package]
+name = "sguard-security"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sguard-core = { version = "0.1.0", path = "../sguard-core", default-features = false }
+log = { workspace = true }
+jsonwebtoken = "9.3.0"
+serde = { workspace = true }
+hyper = { workspace = true }
+downcast-rs = { workspace = true }
+serde_json = { workspace = true }
