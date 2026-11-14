@@ -1,7 +1,5 @@
 use crate::{
-    core::model::Authentication,
-    errors::{AuthError, ErrorType},
-    http::converters::http_auth_converter::HttpAuthConverterManager,
+    core::model::Authentication, errors::{AuthError, ErrorType}, http::converters::http_auth_converter::HttpAuthConverterManager, managers::cookie_auth_manager::CookieAuthManager,
 };
 
 use super::{basic_auth_manager::BasicAuthManager, jwt_auth_manager::JwtAuthManager};
@@ -33,6 +31,7 @@ impl AuthManagerResolver {
         match &converter {
             HttpAuthConverterManager::Basic(_) => Ok(Box::from(BasicAuthManager {})),
             HttpAuthConverterManager::Jwt(_) => Ok(Box::from(JwtAuthManager::new())),
+            HttpAuthConverterManager::Cookie(_) => Ok(Box::from(CookieAuthManager::new())),
             _ => Err(AuthError::new(ErrorType::UnsupportedAuthentication)),
         }
     }

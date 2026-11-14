@@ -13,10 +13,16 @@ use sguard_core::{
     model::context::RequestContext,
 };
 
+use sguard_error::ErrorType;
+
 use sguard_security::{
+    auth,
     core::model::Authentication,
-    errors::{AuthError, ErrorType},
-    http::converters::http_auth_converter::{HttpAuthConverter, HttpAuthConverterManager},
+    errors::{AuthError, ErrorType as AuthErrorType},
+    http::converters::http_auth_converter::{
+        HttpAuthConverter,
+        HttpAuthConverterManager,
+    },
     managers::auth_manager_resolver::AuthManagerResolver,
 };
 use std::sync::Arc;
@@ -41,28 +47,18 @@ impl AuthFilter {
         &self,
         req: &mut RequestContext,
     ) -> Result<Box<dyn Authentication>, AuthError> {
-        // extract the authentication type
-        let auth_converter_mgr = HttpAuthConverterManager::get_auth_converter(&req.request);
-        if auth_converter_mgr.is_err() {
-            // todo something
-            return Err(AuthError::new(ErrorType::UnsupportedAuthentication));
+        let converter = HttpAuthConverterManager::get_auth_converter(&req.request)?;
+        let authentication = converter.convert(&req.request)?;
+
+        let auth_manager = AuthManagerResolver::resolve(&converter)?;
+        let authenticated = auth_manager.authenticate(authentication)?;
+
+        if authenticated.is_authenticated() {
+            log::debug!("User is authenticated, you can proceed");
+        } else {
+            log::debug!("User is not authenticated");
         }
-        let auth_converter_mgr_cloned = auth_converter_mgr.as_ref().clone();
-        let authentication = auth_converter_mgr_cloned.unwrap().convert(&req.request);
-        let auth_manager = AuthManagerResolver::resolve(auth_converter_mgr_cloned.unwrap());
-        let auth_resolved = auth_manager.unwrap().authenticate(authentication.unwrap());
-        match &auth_resolved {
-            Ok(authentication) => {
-                log::debug!("Authentication {:?}", authentication.is_authenticated());
-                if authentication.is_authenticated() {
-                    log::debug!("User is authenticated, you can proceed");
-                } else {
-                    log::debug!("User is not authenticated, you can proceed");
-                }
-                auth_resolved
-            }
-            Err(_) => Err(AuthError::new(ErrorType::Unauthorized)),
-        }
+        Ok(authenticated)
     }
 }
 
@@ -75,17 +71,19 @@ impl Filter for AuthFilter {
 
         if auth_result.is_err() {
             //return exception_translation_filter.handle(req, next);
+            let auth_error = auth_result.err().unwrap();
             let response_handler = ErrorTranslationFilter::create_error_handler(
-                sguard_error::ErrorType::InternalError,
+                ErrorType::new( auth_error.etype.as_str(), auth_error.etype.as_code())
             );
             return response_handler(req);
         }
+        
 
         if auth_result.unwrap().is_authenticated() == false {
             log::debug!("User is not authenticated");
             let response_handler =
-                ErrorTranslationFilter::create_error_handler(sguard_error::ErrorType::CustomCode(
-                    "UnAuthorized",
+                ErrorTranslationFilter::create_error_handler(ErrorType::CustomCode(
+                    String::from("Unauthorized"),
                     StatusCode::UNAUTHORIZED.as_u16(),
                 ));
             return response_handler(req);
@@ -109,6 +107,6 @@ impl FilterChainTrait for AuthFilter {}
 
 impl AuthFilterTrait for AuthFilter {
     fn sub_filter_chain(&self) -> Option<Arc<dyn AuthFilterTrait>> {
-        None
+        self.sub_chain.clone()
     }
 }

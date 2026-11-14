@@ -1,69 +1,58 @@
 use bytes::Bytes;
+use http::StatusCode;
 use http_body_util::Full;
 use std::error::Error as StdError;
 use std::fmt;
 
-use http::StatusCode;
-/// The boxed [Error], the desired way to pass [Error]
+/// The boxed Error, the desired way to pass Error.
 pub type BError = Box<Error>;
 
 pub trait ErrorTrait: StdError + Sized + Send + Sync {}
 
 #[derive(Debug)]
 pub struct Error {
-    /// the type of error
+    /// The type of error.
     pub etype: ErrorType,
-    /// the source of error: from upstream, downstream or internal
+
+    /// The source of error: upstream, downstream or internal.
     pub esource: ErrorSource,
-    // chain to the cause of this error
-    // pub cause: Option<Box<(dyn ErrorTrait + Send + Sync)>>,
-    // pub context: Option<Imm>
 }
 
 impl Error {
-    fn create(
-        etype: ErrorType,
-        esource: ErrorSource,
-        //cause: Option<Box<(dyn ErrorTrait + Send + Sync)>>,
-    ) -> Error {
-        Error {
-            etype,
-            esource,
-            //cause,
-        }
+    fn create(etype: ErrorType, esource: ErrorSource) -> Self {
+        Self { etype, esource }
     }
 
-    fn do_new(e: ErrorType, s: ErrorSource) -> Error {
+    fn do_new(e: ErrorType, s: ErrorSource) -> Self {
         Self::create(e, s)
     }
 
-    pub fn new(e: ErrorType) -> Error {
+    pub fn new(e: ErrorType) -> Self {
         Self::do_new(e, ErrorSource::Unset)
     }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{}", self.etype.as_str())
     }
 }
 
 impl From<std::io::Error> for Error {
-    fn from(error: std::io::Error) -> Self {
-        // Convert the IO error to your custom error type
-        Error::new(ErrorType::Custom("Standard IO Error"))
+    fn from(_error: std::io::Error) -> Self {
+        Error::new(ErrorType::Custom("Standard IO Error".to_string()))
     }
 }
 
 impl From<Error> for std::io::Error {
     fn from(error: Error) -> Self {
-        std::io::Error::new(std::io::ErrorKind::Other, error.etype.as_str())
+        std::io::Error::other(error.etype.as_str().to_string())
     }
 }
 
 impl From<hyper::Error> for Error {
-    fn from(err: hyper::Error) -> Self {
-        Error::new(ErrorType::Custom("Hyper IO Error"))
+    fn from(_err: hyper::Error) -> Self {
+        Error::new(ErrorType::Custom("Hyper IO Error".to_string()))
     }
 }
 
@@ -73,24 +62,19 @@ impl From<tokio::time::error::Elapsed> for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl StdError for Error {}
 
 impl ErrorTrait for Error {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ErrorSource {
-    /// The error is caused by the remote server
     Upstream,
-    /// The error is caused by the remote client
     Downstream,
-    /// The error is caused by the internal logic
     Internal,
-    /// Error source unknown or to be set
     Unset,
 }
 
 impl ErrorSource {
-    /// for displaying the error source
     pub fn as_str(&self) -> &str {
         match self {
             Self::Upstream => "Upstream",
@@ -101,15 +85,16 @@ impl ErrorSource {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ErrorType {
-    // IO Error for connection
+    // IO errors
     ReadError,
     WriteError,
     ReadTimeout,
     WriteTimeout,
     ConnectionClosed,
-    // Connect Error
+
+    // Connection errors
     ConnectTimeout,
     ConnectRefused,
     ConnectNoRoute,
@@ -121,124 +106,117 @@ pub enum ErrorType {
     BindError,
     AcceptError,
     SocketError,
-    // other errors
+
+    // Other errors
     InternalError,
     StateMachineError,
-    // catch all
     UnknownError,
-    /// Custom error with static string.
-    /// this field is to allow users to extend the types of errors. If runtime generated string
-    /// is needed, it is more likely to be treated as "context" rather than "type".
-    Custom(&'static str),
-    /// Custom error with static string and code.
-    /// this field allows users to extend error further with error codes.
-    CustomCode(&'static str, u16),
+
+    // Custom errors
+    Custom(String),
+    CustomCode(String, u16),
 }
 
 impl ErrorType {
-    pub const fn new(name: &'static str, code: u16) -> Self {
-        ErrorType::CustomCode(name, code)
+    /// Creates a custom error with a default HTTP status code.
+    pub fn new(name: impl Into<String>, code: u16) -> Self {
+        Self::CustomCode(name.into(), code)
     }
 
-    /// create a new type of error. Users should try to make `name` unique.
-    pub const fn new_code(name: &'static str, code: u16) -> Self {
-        ErrorType::CustomCode(name, code)
+    /// Creates a custom error without a specific status code.
+    pub fn custom(name: impl Into<String>) -> Self {
+        Self::Custom(name.into())
     }
 
+    /// Returns a human-readable error description.
     pub fn as_str(&self) -> &str {
         match self {
-            ErrorType::ReadError => "ConnectTimeout",
-            ErrorType::WriteError => "WriteError",
-            ErrorType::ReadTimeout => "ReadTimeout",
-            ErrorType::WriteTimeout => "WriteTimeout",
-            ErrorType::ConnectionClosed => "ConnectionClosed",
-            ErrorType::ConnectTimeout => "ConnectTimeout",
-            ErrorType::ConnectRefused => "ConnectRefused",
-            ErrorType::ConnectNoRoute => "ConnectNoRoute",
-            ErrorType::TLSHandshakeFailure => "TLSHandshakeFailure",
-            ErrorType::TLSHandshakeTimeout => "TLSHandshakeTimeout",
-            ErrorType::InvalidCert => "InvalidCert",
-            ErrorType::HandshakeError => "HandshakeError",
-            ErrorType::ConnectError => "ConnectError",
-            ErrorType::BindError => "BindError",
-            ErrorType::AcceptError => "AcceptError",
-            ErrorType::SocketError => "SocketError",
-            ErrorType::InternalError => "InternalError",
-            ErrorType::UnknownError => "UnknownError",
-            ErrorType::StateMachineError => "StateMachineError",
-            ErrorType::Custom(s) => s,
-            ErrorType::CustomCode(s, _) => s,
+            Self::ReadError => "ReadError",
+            Self::WriteError => "WriteError",
+            Self::ReadTimeout => "ReadTimeout",
+            Self::WriteTimeout => "WriteTimeout",
+            Self::ConnectionClosed => "ConnectionClosed",
+            Self::ConnectTimeout => "ConnectTimeout",
+            Self::ConnectRefused => "ConnectRefused",
+            Self::ConnectNoRoute => "ConnectNoRoute",
+            Self::TLSHandshakeFailure => "TLSHandshakeFailure",
+            Self::TLSHandshakeTimeout => "TLSHandshakeTimeout",
+            Self::InvalidCert => "InvalidCert",
+            Self::HandshakeError => "HandshakeError",
+            Self::ConnectError => "ConnectError",
+            Self::BindError => "BindError",
+            Self::AcceptError => "AcceptError",
+            Self::SocketError => "SocketError",
+            Self::InternalError => "InternalError",
+            Self::UnknownError => "UnknownError",
+            Self::StateMachineError => "StateMachineError",
+            Self::Custom(s) => s,
+            Self::CustomCode(s, _) => s,
         }
     }
 
+    /// Returns the associated HTTP status code.
     pub fn as_code(&self) -> u16 {
-        return match self {
-            ErrorType::ReadError | ErrorType::WriteError => {
+        match self {
+            Self::ReadError | Self::WriteError => {
                 StatusCode::INTERNAL_SERVER_ERROR.as_u16()
             }
-            ErrorType::ReadTimeout | ErrorType::WriteTimeout => {
+
+            Self::ReadTimeout | Self::WriteTimeout => {
                 StatusCode::REQUEST_TIMEOUT.as_u16()
             }
-            ErrorType::ConnectionClosed => StatusCode::SERVICE_UNAVAILABLE.as_u16(),
-            ErrorType::ConnectTimeout | ErrorType::ConnectRefused | ErrorType::ConnectNoRoute => {
+
+            Self::ConnectionClosed => {
+                StatusCode::SERVICE_UNAVAILABLE.as_u16()
+            }
+
+            Self::ConnectTimeout | Self::ConnectRefused | Self::ConnectNoRoute => {
                 StatusCode::GATEWAY_TIMEOUT.as_u16()
             }
-            ErrorType::TLSHandshakeFailure
-            | ErrorType::TLSHandshakeTimeout
-            | ErrorType::InvalidCert
-            | ErrorType::HandshakeError => StatusCode::BAD_GATEWAY.as_u16(),
-            ErrorType::ConnectError
-            | ErrorType::BindError
-            | ErrorType::AcceptError
-            | ErrorType::SocketError => StatusCode::BAD_GATEWAY.as_u16(),
-            ErrorType::InternalError => StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-            ErrorType::UnknownError => StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-            ErrorType::StateMachineError => StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-            ErrorType::Custom(_) => todo!(),
-            ErrorType::CustomCode(_, _) => todo!(),
-        };
+
+            Self::TLSHandshakeFailure
+            | Self::TLSHandshakeTimeout
+            | Self::InvalidCert
+            | Self::HandshakeError
+            | Self::ConnectError
+            | Self::BindError
+            | Self::AcceptError
+            | Self::SocketError => {
+                StatusCode::BAD_GATEWAY.as_u16()
+            }
+
+            Self::InternalError
+            | Self::UnknownError
+            | Self::StateMachineError => {
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16()
+            }
+
+            Self::Custom(_) => StatusCode::BAD_REQUEST.as_u16(),
+
+            Self::CustomCode(_, code) => *code,
+        }
     }
 }
 
+// Convert Error into HTTP response body.
 pub trait IntoHyperResponse {
     fn into_hyper_response(&self) -> Full<Bytes>;
 }
 
-// Example implementation for your custom error type (replace YourErrorType)
 impl IntoHyperResponse for Error {
-    // Replace YourErrorType
     fn into_hyper_response(&self) -> Full<Bytes> {
-        // let status = match self {
-
-        //     // ... other error mappings
-        //     _ => StatusCode::INTERNAL_SERVER_ERROR,
-        // };
-        // Response::builder()
-        //     .status(StatusCode::INTERNAL_SERVER_ERROR)
-        //     .body()
-        //     .unwrap()
         Full::new(Bytes::from(self.to_string()))
     }
 }
 
-// Example implementation for the hyper::http::Error case
 impl IntoHyperResponse for hyper::http::Error {
     fn into_hyper_response(&self) -> Full<Bytes> {
-        // Response::builder()
-        //     .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
-        //     .body(Full::new(Bytes::from(self.to_string())))
-        //     .unwrap()
         Full::new(Bytes::from(self.to_string()))
     }
 }
 
-// Example implementation for the String case
 impl IntoHyperResponse for String {
     fn into_hyper_response(&self) -> Full<Bytes> {
-        // Response::builder()
-        //     .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
-        //     .body(Full::new(Bytes::from(self.to_string())))
-        //     .unwrap()
-        Full::new(Bytes::from(self.to_string()))
+        Full::new(Bytes::from(self.clone()))
     }
 }

@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 sguard-core = { version = "0.1.0", path = "../sguard-core", default-features = false }
+sguard-error = { version = "0.1.0", path = "../sguard-error", default-features = false }
 log = { workspace = true }
 jsonwebtoken = "9.3.0"
 serde = { workspace = true }

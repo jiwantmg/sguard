@@ -11,28 +11,34 @@ pub trait ResponseTranslationFilterTrait: FilterChainTrait {
     fn sub_filter_chain(&self) -> Option<Arc<dyn ResponseTranslationFilterTrait>>;
 }
 pub struct ErrorTranslationFilter {}
+
 impl ErrorTranslationFilter {
     pub fn new() -> Self {
         ErrorTranslationFilter {}
     }
+
     pub fn create_error_handler(e: ErrorType) -> FilterFn {
-        let handler: FilterFn = Arc::new(move |req: &mut RequestContext| {
+        let handler: FilterFn = Arc::new(move |_req: &mut RequestContext| {
+            let error_type = e.clone();
             Box::pin(async move {
-                // Box::pin is essential
-                log::error!("Handling error");
+                log::error!("Handling error: {:?}", error_type);
 
-                // Create the error response:
-                let error = Error::new(ErrorType::InternalError);
+                let error = Error::new(error_type);
+
+                // Get status before consuming error.
+                let status = error.etype.as_code();
+
                 let hyper_response = error.into_hyper_response();
-                let response = Response::builder()
-                    .status(error.etype.as_code())
-                    //.header("Content-Length", body_bytes.len())
-                    .body(ResponseBody::Full(hyper_response))
-                    .unwrap(); // Handle unwrap appropriately in real code
 
-                Ok(response) // Return the Result
+                let response = Response::builder()
+                    .status(status)
+                    .body(ResponseBody::Full(hyper_response))
+                    .expect("Failed to build error response");
+
+                Ok(response)
             })
         });
+
         handler
     }
 }

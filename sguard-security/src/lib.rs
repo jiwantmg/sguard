@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod cookie_auth;
 pub mod basic_auth;
 pub mod bearer_auth;
 mod converters;

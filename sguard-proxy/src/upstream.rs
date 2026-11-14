@@ -18,7 +18,7 @@ impl UpstreamService {
     ) -> Result<Response<hyper::body::Incoming>, AppError> {
         let uri_result = req.route_definition.uri.parse::<hyper::Uri>();
         if uri_result.is_err() {
-            return Err(AppError::new(ErrorType::Custom("Invalid url"))); // Early return on error
+            return Err(AppError::new(ErrorType::Custom(String::from("Invalid url")))); // Early return on error
         }
 
         let uri = uri_result.unwrap();

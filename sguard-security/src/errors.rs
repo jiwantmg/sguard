@@ -11,9 +11,10 @@ impl AuthError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ErrorType {
     InvalidToken,
+    InvalidCookie,
     WrongCredentials,
     TokenCreation,
     WriteTimeout,
@@ -29,14 +30,15 @@ pub enum ErrorType {
 impl ErrorType {
     /// Creates a custom error with a static string and code.
     /// Use this method to extend error types with unique names and codes.
-    pub const fn new(name: &'static str, code: u16) -> Self {
-        Self::CustomCode(name, code)
+    pub fn new(name: impl Into<String>, code: u16) -> Self {
+        Self::CustomCode(Box::leak(name.into().into_boxed_str()), code)
     }
 
     /// Returns a human-readable string representation of the error.
     pub fn as_str(&self) -> &str {
         match self {
             Self::InvalidToken => "Invalid token",
+            Self::InvalidCookie => "Invalid cookie",
             Self::WrongCredentials => "Wrong credentials",
             Self::TokenCreation => "Token creation failed",
             Self::WriteTimeout => "Write timeout",
@@ -51,7 +53,8 @@ impl ErrorType {
     /// Returns the associated status code for the error.
     pub fn as_code(&self) -> u16 {
         match self {
-            Self::InvalidToken => StatusCode::UNAUTHORIZED.as_u16(),
+            Self::InvalidToken => StatusCode::BAD_REQUEST.as_u16(),
+            Self::InvalidCookie => StatusCode::BAD_REQUEST.as_u16(),
             Self::WrongCredentials => StatusCode::FORBIDDEN.as_u16(),
             Self::TokenCreation => StatusCode::SERVICE_UNAVAILABLE.as_u16(),
             Self::WriteTimeout => StatusCode::REQUEST_TIMEOUT.as_u16(),
