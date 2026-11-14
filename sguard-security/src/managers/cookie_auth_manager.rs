@@ -1,8 +1,6 @@
 use crate::{
-    core::model::Authentication, errors::AuthError, providers::{AuthProvider, cookie_auth_provider::CookieAuthProvider},
+    core::model::Authentication, errors::AuthError, managers::auth_manager::AuthManager, providers::{AuthProvider, cookie_auth_provider::CookieAuthProvider},
 };
-
-use super::auth_manager_resolver::AuthManager;
 
 pub struct CookieAuthManager {
     provider: Box<dyn AuthProvider>,

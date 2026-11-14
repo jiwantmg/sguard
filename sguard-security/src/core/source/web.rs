@@ -9,6 +9,7 @@ pub struct WebAuthDetailSource {}
 
 impl AuthDetailSource<WebAuthDetail, HttpRequest> for WebAuthDetailSource {
     fn build_detail(context: HttpRequest) -> WebAuthDetail {
+        println!("Building WebAuthDetail from HttpRequest");
         todo!()
     }
 }

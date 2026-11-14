@@ -1,16 +1,16 @@
 use super::AuthProvider;
 use crate::{
-    converters::{auth_converter::AuthConverter, cookie_auth_converter::CookieHttpAuthConverter, jwt_auth_converter::JwtAuthConverter}, core::{model::Authentication, source::web::WebAuthDetailSource}, errors::AuthError,
+    converters::{auth_converter::AuthConverter, cookie_auth_converter::CookieAuthConverter}, core::{model::Authentication, source::web::WebAuthDetailSource}, errors::AuthError,
 };
 
 pub struct CookieAuthProvider {
-    converter: CookieHttpAuthConverter,
+    converter: CookieAuthConverter,
 }
 
 impl CookieAuthProvider {
     pub fn new() -> Self {
         Self {
-            converter: CookieHttpAuthConverter::new(WebAuthDetailSource {}),
+            converter: CookieAuthConverter::new(WebAuthDetailSource {}),
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    converters::cookie_auth_converter::CookieHttpAuthConverter, core::{model::Authentication, source::web::WebAuthDetailSource}, errors::{AuthError, ErrorType},
+    converters::cookie_auth_converter::{CookieAuthConverter}, core::{model::Authentication, source::web::WebAuthDetailSource}, errors::{AuthError, ErrorType},
 };
 use hyper::header::{AUTHORIZATION, COOKIE};
 use sguard_core::model::core::HttpRequest;
@@ -9,7 +9,7 @@ use super::{basic_auth_converter::BasicAuthConverter, jwt_auth_converter::JwtAut
 pub enum AuthConverterManager {
     Basic(BasicAuthConverter),
     Jwt(JwtAuthConverter),
-    Cookie(CookieHttpAuthConverter),
+    Cookie(CookieAuthConverter),
 }
 
 impl AuthConverterManager {
@@ -35,7 +35,7 @@ impl AuthConverterManager {
             // 2. If Authorization is absent, check Cookie header.
             log::debug!("Cookie authentication requested");
             return Ok(AuthConverterManager::Cookie(
-                CookieHttpAuthConverter::new(WebAuthDetailSource {}),
+                CookieAuthConverter::new(WebAuthDetailSource {}),
             ));
         
         }

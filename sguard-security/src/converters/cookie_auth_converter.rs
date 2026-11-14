@@ -4,17 +4,17 @@ use crate::core::model::Authentication;
 use crate::core::source::web::WebAuthDetailSource;
 use crate::errors::{AuthError, ErrorType};
 
-pub struct CookieHttpAuthConverter {
+pub struct CookieAuthConverter {
     auth_detail_source: WebAuthDetailSource,
 }
 
-impl CookieHttpAuthConverter {
+impl CookieAuthConverter {
     pub fn new(auth_detail_source: WebAuthDetailSource) -> Self {
         Self { auth_detail_source }
     }
 }
 
-impl AuthConverter for CookieHttpAuthConverter {
+impl AuthConverter for CookieAuthConverter {
     fn convert(
         &self,
         request: &dyn Authentication,

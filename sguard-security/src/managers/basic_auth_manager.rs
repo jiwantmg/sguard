@@ -1,6 +1,4 @@
-use crate::{core::model::Authentication, errors::AuthError};
-
-use super::auth_manager_resolver::AuthManager;
+use crate::{core::model::Authentication, errors::AuthError, managers::auth_manager::AuthManager};
 
 pub struct BasicAuthManager {}
 

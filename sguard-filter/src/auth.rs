@@ -16,14 +16,10 @@ use sguard_core::{
 use sguard_error::ErrorType;
 
 use sguard_security::{
-    auth,
-    core::model::Authentication,
-    errors::{AuthError, ErrorType as AuthErrorType},
-    http::converters::http_auth_converter::{
+    auth, core::model::Authentication, errors::{AuthError, ErrorType as AuthErrorType}, http::converters::http_auth_converter::{
         HttpAuthConverter,
         HttpAuthConverterManager,
-    },
-    managers::auth_manager_resolver::AuthManagerResolver,
+    }, managers::auth_manager_registry::AuthManagerRegistry
 };
 use std::sync::Arc;
 
@@ -34,6 +30,7 @@ pub trait AuthFilterTrait: FilterChainTrait {
 pub struct AuthFilter {
     sub_chain: Option<Arc<dyn AuthFilterTrait>>,
     auth_converter: Option<Box<dyn HttpAuthConverter>>,
+    registry: Arc<AuthManagerRegistry>,
 }
 
 impl AuthFilter {
@@ -41,6 +38,7 @@ impl AuthFilter {
         AuthFilter {
             sub_chain,
             auth_converter: None,
+            registry: Arc::new(AuthManagerRegistry::new()),
         }
     }
     pub fn attempt_authentication(
@@ -48,9 +46,8 @@ impl AuthFilter {
         req: &mut RequestContext,
     ) -> Result<Box<dyn Authentication>, AuthError> {
         let converter = HttpAuthConverterManager::get_auth_converter(&req.request)?;
-        let authentication = converter.convert(&req.request)?;
-
-        let auth_manager = AuthManagerResolver::resolve(&converter)?;
+        let authentication: Box<dyn Authentication> = converter.convert(&req.request)?;
+        let auth_manager = self.registry.resolve(&converter)?;
         let authenticated = auth_manager.authenticate(authentication)?;
 
         if authenticated.is_authenticated() {
