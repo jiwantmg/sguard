@@ -1,13 +1,7 @@
-use http::{request::Parts, HeaderMap, Method, Request, Response, StatusCode, Uri};
-use http_body::{Body,Frame, SizeHint};
-use hyper::body::Incoming;
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
-use pin_project_lite::pin_project;
-use futures;
 use bytes::Bytes;
+use http::{request::Parts, HeaderMap, Method, Request, Response, StatusCode, Uri};
+use hyper::body::Incoming;
+use pin_project_lite::pin_project;
 
 pub struct HttpRequest {
     pub method: Method,
@@ -103,7 +97,7 @@ impl Default for HttpResponse {
 //                 let mut cx = std::task::Context::from_waker(
 //                     futures::task::noop_waker_ref()
 //                 );
-                
+
 //                 match Body::poll_frame(Pin::new(&mut body), &mut cx) {
 //                     Poll::Ready(Some(Ok(frame))) => {
 //                         if let Some(data) = frame.into_data() {
@@ -120,7 +114,7 @@ impl Default for HttpResponse {
 //                     }
 //                 }
 //             }
-            
+
 //             Ok(Bytes::from(bytes))
 //         } else if let Some(bytes) = self.buffer.take() {
 //             Ok(bytes)

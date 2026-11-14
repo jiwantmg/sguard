@@ -9,6 +9,7 @@ members = [
     "sguard-error",
     "sguard-proxy",
     "sguard-routing",
+    "sguard-security",
 ]
 
 
@@ -30,3 +31,4 @@ bytes = "1.9.0"
 hyper-util = { version = "0.1.10", features = ["tokio"] }
 pin-project-lite = "0.2"
 futures = "0.3"
+downcast-rs = "2.0.1"

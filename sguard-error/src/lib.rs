@@ -1,3 +1,5 @@
+use bytes::Bytes;
+use http_body_util::Full;
 use std::error::Error as StdError;
 use std::fmt;
 
@@ -53,6 +55,12 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl From<Error> for std::io::Error {
+    fn from(error: Error) -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, error.etype.as_str())
+    }
+}
+
 impl From<hyper::Error> for Error {
     fn from(err: hyper::Error) -> Self {
         Error::new(ErrorType::Custom("Hyper IO Error"))
@@ -61,13 +69,12 @@ impl From<hyper::Error> for Error {
 
 impl From<tokio::time::error::Elapsed> for Error {
     fn from(_: tokio::time::error::Elapsed) -> Self {
-        Error::new(
-           ErrorType::ConnectTimeout
-        )
+        Error::new(ErrorType::ConnectTimeout)
     }
 }
 
 impl std::error::Error for Error {}
+
 impl ErrorTrait for Error {}
 
 #[derive(Debug)]
@@ -125,7 +132,7 @@ pub enum ErrorType {
     Custom(&'static str),
     /// Custom error with static string and code.
     /// this field allows users to extend error further with error codes.
-    CustomCode(&'static str, u16)
+    CustomCode(&'static str, u16),
 }
 
 impl ErrorType {
@@ -190,5 +197,48 @@ impl ErrorType {
             ErrorType::Custom(_) => todo!(),
             ErrorType::CustomCode(_, _) => todo!(),
         };
+    }
+}
+
+pub trait IntoHyperResponse {
+    fn into_hyper_response(&self) -> Full<Bytes>;
+}
+
+// Example implementation for your custom error type (replace YourErrorType)
+impl IntoHyperResponse for Error {
+    // Replace YourErrorType
+    fn into_hyper_response(&self) -> Full<Bytes> {
+        // let status = match self {
+
+        //     // ... other error mappings
+        //     _ => StatusCode::INTERNAL_SERVER_ERROR,
+        // };
+        // Response::builder()
+        //     .status(StatusCode::INTERNAL_SERVER_ERROR)
+        //     .body()
+        //     .unwrap()
+        Full::new(Bytes::from(self.to_string()))
+    }
+}
+
+// Example implementation for the hyper::http::Error case
+impl IntoHyperResponse for hyper::http::Error {
+    fn into_hyper_response(&self) -> Full<Bytes> {
+        // Response::builder()
+        //     .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
+        //     .body(Full::new(Bytes::from(self.to_string())))
+        //     .unwrap()
+        Full::new(Bytes::from(self.to_string()))
+    }
+}
+
+// Example implementation for the String case
+impl IntoHyperResponse for String {
+    fn into_hyper_response(&self) -> Full<Bytes> {
+        // Response::builder()
+        //     .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
+        //     .body(Full::new(Bytes::from(self.to_string())))
+        //     .unwrap()
+        Full::new(Bytes::from(self.to_string()))
     }
 }

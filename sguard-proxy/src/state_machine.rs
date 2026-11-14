@@ -119,13 +119,16 @@ impl StateMachine {
                     match response {
                         Ok(response) => {
                             //self.response = Some(ResponseEntity::build_success(HttpResponse::from(response_body)));
-                            self.response = Some(response);                                
+                            self.response = Some(response);
+                            self.state = State::Completed;
                             self.tx.send(ConnectionEvent::Complete).await.unwrap();
                         }
-                        Err(_) => {
+                        Err(err) => {
                             // self.response = Some(ResponseEntity::build_error(Error::new(
                             //     sguard_error::ErrorType::ConnectError,
                             // )));
+                            log::error!("Error from upstream: {:?}", err);
+                            self.state = State::Completed;
                             self.tx.send(ConnectionEvent::Fail).await.unwrap();
                         }
                     }
@@ -154,10 +157,8 @@ impl StateMachine {
                     match response {
                         Ok(response) => {
                             // self.response =
-                            //     Some(ResponseEntity::build_success(HttpResponse::from(response)));
                             log::debug!("Response {:?}", response.status());
                             self.response = Some(response);
-                                //Some(ResponseEntity::build_success(HttpResponse::default()));
                             self.state = State::Completed;
                             self.tx.send(ConnectionEvent::Complete).await.unwrap();
                         }
