@@ -1,5 +1,7 @@
-use crate::core::{Filter, FilterFn, FilterRs};
-use hyper::{Body, Request};
+use sguard_core::{
+    filter::{Filter, FilterFn, FilterRs},
+    model::context::RequestContext,
+};
 use std::sync::Arc;
 
 pub trait FilterChainTrait: Filter {}
@@ -14,8 +16,8 @@ impl FilterChain {
 }
 
 impl Filter for FilterChain {
-    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
-        let mut next = next.clone();
+    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
+        let mut next: Arc<dyn Fn(&mut RequestContext) -> FilterRs + Send + Sync> = next.clone();
         // Build the filter chain in reverse order. Building the filter chain in reverse
         // order is a common pattern in middleware and filter frameworks, particularly in web
         // servers and processing pipelines. Here’s why this approach is used
@@ -35,7 +37,8 @@ impl Filter for FilterChain {
         for filter in self.filters.iter().rev() {
             let current_next = next.clone();
             let filter = filter.clone();
-            next = Arc::new(move |req| filter.handle(req, current_next.clone()));
+            next =
+                Arc::new(move |req: &mut RequestContext| filter.handle(req, current_next.clone()))
         }
         next(req)
     }

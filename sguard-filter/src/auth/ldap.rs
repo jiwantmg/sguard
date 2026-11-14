@@ -1,13 +1,12 @@
-use crate::core::{Filter, FilterFn, FilterRs};
 use crate::filter_chain::FilterChainTrait;
-use hyper::{Body, Request};
+use sguard_core::{filter::{Filter, FilterFn, FilterRs}, model::context::RequestContext};
 use std::sync::Arc;
 
 use super::AuthFilterTrait;
 pub struct SGuardLdapAuth;
 
 impl Filter for SGuardLdapAuth {
-    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
+    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
         log::debug!("Filter: Ldap authentications");
         // Perform authentication logic here
         next(req)

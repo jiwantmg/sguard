@@ -5,3 +5,7 @@ edition = "2021"
 
 [dependencies]
 http = { workspace = true }
+hyper = { workspace = true }
+tokio = { workspace = true }
+bytes = { workspace = true}
+http-body-util = { workspace = true }

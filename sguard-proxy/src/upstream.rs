@@ -1,28 +1,71 @@
-use hyper::{client::HttpConnector, Body, Client, Request};
+use std::io::Error;
 
-pub struct UpstreamService {
-    http_client: Client<HttpConnector, Body>,
-}
+use bytes::Bytes;
+use hyper::Response;
+use hyper_util::rt::TokioIo;
+use sguard_core::model::context::RequestContext;
+use sguard_error::{Error as AppError, ErrorType};
+use tokio::net::TcpStream;
+use tokio::time::{timeout, Duration};
+
+#[derive(Clone, Default)]
+pub struct UpstreamService {}
 
 impl UpstreamService {
-    pub fn new() -> Self {
-        UpstreamService {
-            http_client: Client::new(),
+    pub async fn call_upstream_service(
+        &self,
+        req: &mut RequestContext,
+    ) -> Result<Response<hyper::body::Incoming>, AppError> {
+        let uri_result = req.route_definition.uri.parse::<hyper::Uri>();
+        if uri_result.is_err() {
+            return Err(AppError::new(ErrorType::Custom("Invalid url"))); // Early return on error
         }
-    }
 
-    pub async fn call_upstream_service(&self) -> Result<String, hyper::Error> {
-        let uri: String = "http://localhost:3000/".parse().unwrap();
+        let uri = uri_result.unwrap();
+        let host = uri.host().expect("uri has no host");
+        let port = uri.port_u16().unwrap_or(80);
+        let address = format!("{}:{}", host, port);
+        // Open a TCP connection to the remote host
+        let stream = TcpStream::connect(address).await?;
 
-        let request = Request::builder()
-            .method("GET")
-            .uri(uri)
-            .header("Content-Type", "application/json")
-            .body(Body::empty())
-            .expect("Failed to build request");
+        // Use an adapter to access something implementing `tokio::io` traits as if they implement
+        // `hyper::rt` IO traits.
+        let io = TokioIo::new(stream);
+        // Create the Hyper client
+        log::trace!("Handshaking to remote server");
+        let handshake = hyper::client::conn::http1::handshake(io);
+        let (mut sender, conn) =
+            timeout(Duration::from_secs(3), handshake)
+                .await?
+                .map_err(|_| {
+                    Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "Upstream service not available",
+                    )
+                })?;
+        tokio::task::spawn(async move {
+            if let Err(err) = conn.await {
+                println!("Connection failed: {:?}", err);
+            }
+        });
+        // if let (Some(incoming), Some(parts)) = (req.request.incoming.take(), req.request.parts) {
 
-        let response = self.http_client.request(request).await?;
-        let body = hyper::body::to_bytes(response.into_body()).await?;
-        Ok(String::from_utf8(body.to_vec()).expect("Failed to convert body to string"))
+        // }
+
+        let body = req.request.incoming.take().unwrap();
+        let parts = req.request.parts.take().unwrap();
+        let request_body = hyper::Request::from_parts(parts, body);
+        let response = sender.send_request(request_body).await;
+        match response {
+            Ok(response) => {
+                //let (parts, body) = response.into_parts();
+
+                // Create a new body from the bytes
+
+                // Return response with the reconstructed body
+                Ok(response)
+            }
+            Err(err) => Err(AppError::new(ErrorType::ConnectTimeout)),
+        }
     }
 }

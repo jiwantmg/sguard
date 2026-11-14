@@ -1,9 +1,6 @@
 use std::sync::Arc;
-
-use hyper::{Body, Request};
-
-use crate::core::{Filter, FilterFn, FilterRs};
 use crate::filter_chain::FilterChainTrait;
+use sguard_core::{filter::{Filter, FilterFn, FilterRs}, model::context::RequestContext};
 
 pub trait ExceptionTranslationFilterTrait: FilterChainTrait {
     fn sub_filter_chain(&self) -> Option<Arc<dyn ExceptionTranslationFilterTrait>>;
@@ -17,7 +14,7 @@ impl ExceptionTranslationFilter {
     }
 }
 impl Filter for ExceptionTranslationFilter {
-    fn handle(&self, req: &Request<Body>, next: FilterFn) -> FilterRs {
+    fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
         log::debug!("Filter: ExceptionTranslationFilter");
         next(req)
     }

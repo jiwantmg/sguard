@@ -1,9 +1,10 @@
 pub mod auth;
-pub mod core;
 pub mod exception;
 pub mod filter_chain;
 pub mod http;
 pub mod logging;
+pub mod response;
 pub mod routing;
 pub mod security;
 pub mod session;
+pub mod error;

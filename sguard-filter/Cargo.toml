@@ -9,6 +9,7 @@ log = { workspace = true }
 tokio = { workspace = true }
 sguard-error = { version = "0.1.0", path = "../sguard-error" }
 sguard-proxy = { version = "0.1.0", path = "../sguard-proxy" }
-sguard-core = { version = "0.1.0", path= "../sguard-core", default-features = false}
+sguard-security = { version = "0.1.0", path = "../sguard-security" }
+sguard-core = { version = "0.1.0", path = "../sguard-core", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

@@ -1,3 +1,5 @@
+use bytes::Bytes;
+use http_body_util::Full;
 use std::error::Error as StdError;
 use std::fmt;
 
@@ -17,6 +19,63 @@ pub struct Error {
     // pub cause: Option<Box<(dyn ErrorTrait + Send + Sync)>>,
     // pub context: Option<Imm>
 }
+
+impl Error {
+    fn create(
+        etype: ErrorType,
+        esource: ErrorSource,
+        //cause: Option<Box<(dyn ErrorTrait + Send + Sync)>>,
+    ) -> Error {
+        Error {
+            etype,
+            esource,
+            //cause,
+        }
+    }
+
+    fn do_new(e: ErrorType, s: ErrorSource) -> Error {
+        Self::create(e, s)
+    }
+
+    pub fn new(e: ErrorType) -> Error {
+        Self::do_new(e, ErrorSource::Unset)
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(error: std::io::Error) -> Self {
+        // Convert the IO error to your custom error type
+        Error::new(ErrorType::Custom("Standard IO Error"))
+    }
+}
+
+impl From<Error> for std::io::Error {
+    fn from(error: Error) -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, error.etype.as_str())
+    }
+}
+
+impl From<hyper::Error> for Error {
+    fn from(err: hyper::Error) -> Self {
+        Error::new(ErrorType::Custom("Hyper IO Error"))
+    }
+}
+
+impl From<tokio::time::error::Elapsed> for Error {
+    fn from(_: tokio::time::error::Elapsed) -> Self {
+        Error::new(ErrorType::ConnectTimeout)
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl ErrorTrait for Error {}
 
 #[derive(Debug)]
 pub enum ErrorSource {
@@ -141,33 +200,45 @@ impl ErrorType {
     }
 }
 
-impl Error {
-    pub fn create(
-        etype: ErrorType,
-        esource: ErrorSource,
-        //cause: Option<Box<(dyn ErrorTrait + Send + Sync)>>,
-    ) -> BError {
-        Box::new(Error {
-            etype,
-            esource,
-            //cause,
-        })
-    }
+pub trait IntoHyperResponse {
+    fn into_hyper_response(&self) -> Full<Bytes>;
+}
 
-    fn do_new(e: ErrorType, s: ErrorSource) -> BError {
-        Self::create(e, s)
-    }
+// Example implementation for your custom error type (replace YourErrorType)
+impl IntoHyperResponse for Error {
+    // Replace YourErrorType
+    fn into_hyper_response(&self) -> Full<Bytes> {
+        // let status = match self {
 
-    pub fn new(e: ErrorType) -> BError {
-        Self::do_new(e, ErrorSource::Unset)
+        //     // ... other error mappings
+        //     _ => StatusCode::INTERNAL_SERVER_ERROR,
+        // };
+        // Response::builder()
+        //     .status(StatusCode::INTERNAL_SERVER_ERROR)
+        //     .body()
+        //     .unwrap()
+        Full::new(Bytes::from(self.to_string()))
     }
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+// Example implementation for the hyper::http::Error case
+impl IntoHyperResponse for hyper::http::Error {
+    fn into_hyper_response(&self) -> Full<Bytes> {
+        // Response::builder()
+        //     .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
+        //     .body(Full::new(Bytes::from(self.to_string())))
+        //     .unwrap()
+        Full::new(Bytes::from(self.to_string()))
     }
 }
 
-impl std::error::Error for Error {}
-impl ErrorTrait for Error {}
+// Example implementation for the String case
+impl IntoHyperResponse for String {
+    fn into_hyper_response(&self) -> Full<Bytes> {
+        // Response::builder()
+        //     .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
+        //     .body(Full::new(Bytes::from(self.to_string())))
+        //     .unwrap()
+        Full::new(Bytes::from(self.to_string()))
+    }
+}
