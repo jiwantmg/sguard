@@ -1,38 +1,53 @@
+use std::ops::{Deref, DerefMut};
 use bytes::Bytes;
-use http::{request::Parts, HeaderMap, Method, Request, Response, StatusCode, Uri};
+use http::{request::Parts, HeaderMap, Request, Response, StatusCode};
 use hyper::body::Incoming;
 use pin_project_lite::pin_project;
 
 pub struct HttpRequest {
-    pub method: Method,
-    pub uri: Uri,
-    pub headers: HeaderMap,
+    pub parts: Parts,
     pub incoming: Option<Incoming>,
-    pub parts: Option<Parts>,
 }
 
 impl HttpRequest {
     pub fn new() -> Self {
+        let (parts, _) = Request::new(()).into_parts();
         HttpRequest {
-            method: Method::GET,
-            uri: Uri::default(),
-            headers: HeaderMap::new(),
+            parts,
             incoming: None,
-            parts: None,
         }
     }
+
+    pub fn take_parts(&mut self) -> Parts {
+        let (empty, _) = Request::new(()).into_parts();
+        std::mem::replace(&mut self.parts, empty)
+    }
+
     pub async fn from_hyper_request(req: Request<Incoming>) -> Result<HttpRequest, hyper::Error> {
-        let (parts, incoming) = req.into_parts(); // Split into parts and body
-        let parts_copy = parts.clone();
-        let request = HttpRequest {
-            method: parts.method,
-            uri: parts.uri,
-            headers: parts.headers,
-            //body: incoming.collect().await?.to_bytes(),
+        let (parts, incoming) = req.into_parts();
+        Ok(HttpRequest {
+            parts,
             incoming: Some(incoming),
-            parts: Some(parts_copy),
-        };
-        Ok(request)
+        })
+    }
+}
+
+impl Default for HttpRequest {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Deref for HttpRequest {
+    type Target = Parts;
+    fn deref(&self) -> &Self::Target {
+        &self.parts
+    }
+}
+
+impl DerefMut for HttpRequest {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.parts
     }
 }
 
@@ -56,6 +71,43 @@ impl Default for HttpResponse {
             is_end: false,
             buffer: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use http::{header::AUTHORIZATION, HeaderValue, Method, Request};
+
+    #[test]
+    fn test_http_request_deref_and_take() {
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/api/test")
+            .header(AUTHORIZATION, "Bearer test_token")
+            .body(())
+            .unwrap();
+        let (parts, _) = req.into_parts();
+        let mut http_req = HttpRequest {
+            parts,
+            incoming: None,
+        };
+
+        // Deref access
+        assert_eq!(http_req.method, Method::POST);
+        assert_eq!(http_req.uri.path(), "/api/test");
+        assert_eq!(
+            http_req.headers.get(AUTHORIZATION),
+            Some(&HeaderValue::from_static("Bearer test_token"))
+        );
+
+        // Take parts without cloning
+        let taken = http_req.take_parts();
+        assert_eq!(taken.method, Method::POST);
+        assert_eq!(taken.uri.path(), "/api/test");
+
+        // http_req.parts is now replaced with an empty parts
+        assert_eq!(http_req.headers.len(), 0);
     }
 }
 

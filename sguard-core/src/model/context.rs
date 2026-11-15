@@ -15,14 +15,15 @@ impl RequestContext {
     }
 
     pub fn clone_request(&mut self) -> HttpRequest {   
+        self.take_request()
+    }
+
+    pub fn take_request(&mut self) -> HttpRequest {
         HttpRequest {
-            method: self.request.method.clone(),
-            uri: self.request.uri.clone(),
-            headers: self.request.headers.clone(),
+            parts: self.request.take_parts(),
             incoming: self.request.incoming.take(),
-            parts: self.request.parts.take()
-        }        
-     }
+        }
+    }
 
     pub fn set_route_definition(&mut self, route_def: RouteDefinition) {
         self.route_definition = route_def;

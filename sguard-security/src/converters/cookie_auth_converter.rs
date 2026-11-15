@@ -1,0 +1,44 @@
+use super::auth_converter::AuthConverter;
+use crate::cookie_auth::CookieAuthToken;
+use crate::core::model::Authentication;
+use crate::core::source::web::WebAuthDetailSource;
+use crate::errors::{AuthError, ErrorType};
+
+pub struct CookieAuthConverter {
+    auth_detail_source: WebAuthDetailSource,
+}
+
+impl CookieAuthConverter {
+    pub fn new(auth_detail_source: WebAuthDetailSource) -> Self {
+        Self { auth_detail_source }
+    }
+}
+
+impl AuthConverter for CookieAuthConverter {
+    fn convert(
+        &self,
+        request: &dyn Authentication,
+    ) -> Result<Box<dyn Authentication>, AuthError> {
+        let cookie_auth = request
+            .downcast_ref::<CookieAuthToken>()
+            .ok_or_else(|| AuthError::new(ErrorType::UnsupportedAuthentication))?;
+        let session_id = &cookie_auth.cookie;
+
+        if session_id.is_empty() {
+            return Err(AuthError::new(ErrorType::InvalidCookie));
+        }
+
+        // TODO: Validate session_id against your session store/database.
+        // TODO: Retrieve the associated user.
+
+        let mut authentication = cookie_auth.clone();
+        // Temporary validation for testing.
+        if session_id == "valid-session-id" {
+            authentication.set_authenticated(true);
+        } else {
+            return Err(AuthError::new(ErrorType::InvalidCookie));
+        }
+
+        Ok(Box::new(authentication))
+    }
+}

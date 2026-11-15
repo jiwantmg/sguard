@@ -15,9 +15,6 @@ impl CsrfFilter {
     }
 }
 
-// Error type returned when CSRF is invalid
-pub const ERR_INVALID_CSRF: ErrorType = ErrorType::Custom("INVALID CSRF");
-
 impl Filter for CsrfFilter {
     fn handle(&self, req: &mut RequestContext, next: FilterFn) -> FilterRs {
         log::debug!("Filter: CsrfFilter");

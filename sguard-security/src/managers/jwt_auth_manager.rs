@@ -1,10 +1,6 @@
 use crate::{
-    core::model::Authentication,
-    errors::AuthError,
-    providers::{jwt_auth_provider::JwtAuthProvider, AuthProvider},
+    core::model::Authentication, errors::AuthError, managers::auth_manager::AuthManager, providers::{AuthProvider, jwt_auth_provider::JwtAuthProvider},
 };
-
-use super::auth_manager_resolver::AuthManager;
 
 pub struct JwtAuthManager {
     provider: Box<dyn AuthProvider>,

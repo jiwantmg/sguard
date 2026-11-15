@@ -1,4 +1,8 @@
 routes:
+  - id: nginx-health
+    uri: http://127.0.0.1:9000
+    predicates:
+      - Path=/health
   # Route Mapping
   - id: lb-user-service
     uri: https://google.com

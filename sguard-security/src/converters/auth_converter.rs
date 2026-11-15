@@ -1,8 +1,7 @@
 use crate::{
-    core::{model::Authentication, source::web::WebAuthDetailSource},
-    errors::{AuthError, ErrorType},
+    converters::cookie_auth_converter::{CookieAuthConverter}, core::{model::Authentication, source::web::WebAuthDetailSource}, errors::{AuthError, ErrorType},
 };
-use hyper::header::AUTHORIZATION;
+use hyper::header::{AUTHORIZATION, COOKIE};
 use sguard_core::model::core::HttpRequest;
 
 use super::{basic_auth_converter::BasicAuthConverter, jwt_auth_converter::JwtAuthConverter};
@@ -10,6 +9,7 @@ use super::{basic_auth_converter::BasicAuthConverter, jwt_auth_converter::JwtAut
 pub enum AuthConverterManager {
     Basic(BasicAuthConverter),
     Jwt(JwtAuthConverter),
+    Cookie(CookieAuthConverter),
 }
 
 impl AuthConverterManager {
@@ -31,7 +31,15 @@ impl AuthConverterManager {
                 ))),
                 _ => Err(AuthError::new(ErrorType::UnsupportedAuthentication)),
             }
-        } else {
+        } else if req.headers.contains_key(COOKIE) {
+            // 2. If Authorization is absent, check Cookie header.
+            log::debug!("Cookie authentication requested");
+            return Ok(AuthConverterManager::Cookie(
+                CookieAuthConverter::new(WebAuthDetailSource {}),
+            ));
+        
+        }
+         else {
             Err(AuthError::new(ErrorType::UnknownError))
         }
     }
