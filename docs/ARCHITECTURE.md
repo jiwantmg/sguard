@@ -208,28 +208,137 @@ SGuard incorporates defensive mechanisms against socket exhaustion, thread starv
 
 ---
 
-## 7. Security Architecture Deep Dive
+## 7. Security Architecture: The HTTP Adapter & Converter Concept
 
-The authentication model in `sguard-security` follows a multi-stage flow:
+A foundational architectural design in SGuard's security subsystem (`sguard-security`) is the **HTTP Adapter & Converter Pattern**, heavily inspired by enterprise security architectures (such as Spring Security) and adapted to native asynchronous Rust.
+
+### 7.1. What Problem Are We Trying to Solve?
+
+In an API Gateway, credentials arrive in diverse HTTP formats:
+- `Authorization: Bearer <jwt>`
+- `Authorization: Basic <base64>`
+- `Cookie: session=<session_id>`
+- Query parameters (e.g. `?api_key=...`)
+- Headers like `X-API-Key` or mTLS client certificates
+
+If authentication logic is embedded directly inside gateway filters or routing handlers:
+1. **Protocol Coupling**: Core authentication rules become entangled with HTTP protocol primitives (`HeaderMap`, raw cookies, status codes, socket streams).
+2. **Poor Extensibility**: Supporting a new authentication scheme (e.g., OAuth2, LDAP, SAML) would require modifying the HTTP request handler and risk breaking existing routing rules.
+3. **Inability to Support Non-HTTP Transports**: The authentication engine cannot be reused if SGuard introduces gRPC, WebSocket, or internal RPC interfaces.
+
+### 7.2. The Solution: Two-Tier Adapter & Converter Architecture
+
+SGuard separates authentication into two distinct, decoupled stages:
+1. **Protocol Adapter Layer (`HttpAuthConverter`)**: Extracts raw credentials from the transport protocol (HTTP) and converts them into an unauthenticated, protocol-agnostic **`Authentication` Token**.
+2. **Domain Verification Layer (`AuthManager` & `AuthProvider`)**: Validates credentials (cryptographic signature verification, session store lookups, database checks) and attaches authenticated identity (`Principal`) without any knowledge of HTTP.
 
 ```mermaid
-flowchart LR
-    Req["Incoming HttpRequest"] --> Manager["HttpAuthConverterManager"]
-    Manager -->|Inspect Headers / Cookies| Conv["HttpAuthConverter\n(Basic / JWT / Cookie)"]
-    Conv -->|Extract Credentials| Token["Authentication Token\n(Downcastable)"]
-    Token --> Registry["AuthManagerRegistry"]
-    Registry --> SpecificMgr["AuthManager\n(e.g., JwtAuthManager)"]
-    SpecificMgr --> Provider["AuthProvider\n(e.g., JwtAuthProvider)"]
-    Provider -->|Verify Signature / Claims| AuthStatus{"Valid?"}
-    AuthStatus -->|Yes| OK["Token Authenticated = true"]
-    AuthStatus -->|No| Err["Return AuthError (401 / 403)"]
+flowchart TD
+    subgraph Protocol_Layer ["1. Protocol Adapter Layer (Transport Ingestion)"]
+        Req["HttpRequest\n(Headers, Cookies, Query)"] --> Manager["HttpAuthConverterManager\n(Inspects AUTHORIZATION / COOKIE)"]
+        Manager -->|Bearer| ConvJWT["JwtHttpAuthConverter"]
+        Manager -->|Basic| ConvBasic["BasicHttpAuthConverter"]
+        Manager -->|Cookie| ConvCookie["CookieHttpAuthConverter"]
+    end
+
+    subgraph Token_Layer ["2. Security Token Model (Protocol-Agnostic)"]
+        ConvJWT -->|Creates| Token1["JwtAuthToken\n(Unauthenticated)"]
+        ConvBasic -->|Creates| Token2["BasicAuthentication\n(Unauthenticated)"]
+        ConvCookie -->|Creates| Token3["CookieAuthToken\n(Unauthenticated)"]
+    end
+
+    subgraph Dispatch_Layer ["3. Registry & Dispatch"]
+        Token1 --> Reg["AuthManagerRegistry\n(Zero-allocation borrow)"]
+        Token2 --> Reg
+        Token3 --> Reg
+        Reg -->|Resolves| SpecificManager["AuthManager\n(JwtAuthManager / BasicAuthManager / CookieAuthManager)"]
+    end
+
+    subgraph Verification_Layer ["4. Provider & Verification (Domain Logic)"]
+        SpecificManager --> Provider["AuthProvider\n(e.g., JwtAuthProvider)"]
+        Provider --> DomainConverter["AuthConverter\n(Extracts claims, validates DB/store)"]
+        DomainConverter --> AuthResult{"Credentials Valid?"}
+        AuthResult -->|Yes| Authenticated["Box<dyn Authentication>\nis_authenticated() = true\nPrincipal attached"]
+        AuthResult -->|No| AuthErr["AuthError\n(401 Unauthorized / 403 Forbidden)"]
+    end
 ```
 
-1. **Extraction**: `HttpAuthConverterManager` inspects headers (`Authorization: Bearer ...`, `Authorization: Basic ...`) or session cookies (`Cookie: session=...`) and selects the appropriate converter.
-2. **Token Generation**: An unauthenticated `Authentication` token is created.
-3. **Dispatch**: `AuthManagerRegistry` routes the token to the registered `AuthManager`.
-4. **Verification**: An `AuthProvider` decodes and validates credentials (e.g. verifying JWT signature with HMAC-SHA256 / RSA, or validating session cookies).
-5. **Context Propagation**: Upon success, the principal is marked authenticated; upon failure, the filter pipeline short-circuits to an error response.
+---
+
+### 7.3. Core Components & Their Responsibilities
+
+#### 1. `HttpAuthConverter` (The Protocol Ingestion Adapter)
+Located in [`sguard-security/src/http/converters/`](file:///home/jiwan/Projects/sguard/sguard-security/src/http/converters/):
+```rust
+pub trait HttpAuthConverter: Send + Sync {
+    fn convert(&self, request: &HttpRequest) -> Result<Box<dyn Authentication>, AuthError>;
+}
+```
+- **Responsibility**: Inspects `HttpRequest` headers, query parameters, or cookies and maps raw wire strings into an unauthenticated `Authentication` token.
+- **Implementations**:
+  - `JwtHttpAuthConverter`: Extracts `Authorization: Bearer <token>` and builds `JwtAuthToken`.
+  - `BasicHttpAuthConverter`: Extracts `Authorization: Basic <base64>` and builds `BasicAuthentication`.
+  - `CookieHttpAuthConverter`: Extracts `Cookie: session=<id>` and builds `CookieAuthToken`.
+
+#### 2. `HttpAuthConverterManager` (Protocol Strategy Selector)
+- Acts as a factory and runtime strategy selector:
+  - Inspects `Authorization` header first (`Bearer` vs `Basic`).
+  - Falls back to `Cookie: session` if `Authorization` is absent.
+  - Rejects malformed or unsupported schemes early with `AuthError(ErrorType::WrongCredentials)`.
+
+#### 3. `Authentication` Trait & `downcast-rs` (The Security Token)
+Located in [`sguard-security/src/core/model.rs`](file:///home/jiwan/Projects/sguard/sguard-security/src/core/model.rs):
+```rust
+pub trait Authentication: Downcast {
+    fn is_authenticated(&self) -> bool;
+    fn set_authenticated(&mut self, is_authenticated: bool);
+    fn get_principal(&self) -> Box<dyn Principal>;
+}
+impl_downcast!(Authentication);
+```
+- A type-erased token representing the user/client authentication state.
+- Uses `downcast-rs` so that downstream providers can safely downcast `&dyn Authentication` back to concrete structs (`token.downcast_ref::<JwtAuthToken>()`) without unsafe code.
+
+#### 4. `AuthManagerRegistry` & `AuthManager` (Dispatcher)
+Located in [`sguard-security/src/managers/`](file:///home/jiwan/Projects/sguard/sguard-security/src/managers/):
+- **`AuthManagerRegistry`**: Pre-allocates single instances of `BasicAuthManager`, `JwtAuthManager`, and `CookieAuthManager` at startup. During request handling, it resolves the appropriate manager by reference with **zero heap allocations**.
+- **`AuthManager`**: The orchestration interface coordinating authentication verification.
+
+#### 5. `AuthProvider` & `AuthConverter` (Domain Verification)
+Located in [`sguard-security/src/providers/`](file:///home/jiwan/Projects/sguard/sguard-security/src/providers/) and [`sguard-security/src/converters/`](file:///home/jiwan/Projects/sguard/sguard-security/src/converters/):
+- **`AuthProvider`**: Executes the verification logic:
+  - `JwtAuthProvider`: Verifies cryptographic signatures (HMAC-SHA256), validates claims (`exp`, `aud`, `iss`), and populates subject details.
+  - `CookieAuthProvider`: Validates session IDs against the session cache or user database.
+  - `BasicAuthProvider`: Validates credentials against identity stores.
+  - `OpenSaml5AuthProvider`: Validates XML signatures and SAML assertion tokens.
+- **`AuthConverter`**: Performs domain-level token transformation:
+  ```rust
+  pub trait AuthConverter: Send + Sync {
+      fn convert(&self, request: &dyn Authentication) -> Result<Box<dyn Authentication>, AuthError>;
+  }
+  ```
+  Transitions the token from unverified to verified (`is_authenticated = true`) with resolved permissions.
+
+#### 6. `WebAuthDetailSource` & `WebAuthDetail` (Context Metadata)
+Located in [`sguard-security/src/core/source/web.rs`](file:///home/jiwan/Projects/sguard/sguard-security/src/core/source/web.rs):
+- Captures auxiliary transport metadata (e.g. client IP address, User-Agent, original request timestamp) and attaches it to the token without polluting the core principal credentials.
+
+---
+
+### 7.4. Benefits Achieved by This Design
+
+1. **Strict Separation of Concerns**:
+   - `HttpAuthConverter` knows everything about HTTP wire formats and nothing about how tokens are cryptographically verified or looked up in databases.
+   - `AuthProvider` knows everything about token verification and nothing about HTTP headers, cookies, or sockets.
+2. **Plug-and-Play Extensibility**:
+   - Adding a new authentication mechanism (e.g. API Keys via `X-API-Key`) requires only:
+     1. Creating `ApiKeyHttpAuthConverter: HttpAuthConverter`
+     2. Creating `ApiKeyAuthToken: Authentication`
+     3. Registering `ApiKeyAuthProvider: AuthProvider`
+   - Zero changes are required to the routing engine, Hyper server driver, or existing authentication schemes.
+3. **Zero-Allocation Hot Path**:
+   - Strategy resolution in `AuthManagerRegistry` operates on borrowed references, avoiding per-request allocations.
+   - Cached cryptographic keys (`LazyLock<DecodingKey>`) allow fast signature checks without parsing or allocation overhead.
 
 ---
 
