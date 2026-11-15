@@ -1,6 +1,6 @@
 routes:
   - id: nginx-health
-    uri: http://localhost:9000
+    uri: http://127.0.0.1:9000
     predicates:
       - Path=/health
   # Route Mapping

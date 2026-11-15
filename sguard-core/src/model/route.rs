@@ -65,7 +65,7 @@ impl RouteBuilder {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct RouteDefinition {
     /// Unique identifier for the route.
     pub id: String,
@@ -73,14 +73,18 @@ pub struct RouteDefinition {
     pub uri_pattern: String,
     /// Upstream URL where matching requests will be routed.
     pub uri: String,
+    /// Pre-parsed upstream URL (scheme, host, port, base path).
+    pub parsed_uri: Option<http::Uri>,
 }
 
 impl RouteDefinition {
-    pub fn from_route(route: &Route) -> Self{
+    pub fn from_route(route: &Route) -> Self {
+        let parsed_uri = route.uri.parse::<http::Uri>().ok();
         RouteDefinition {
             id: route.id.clone(),
             uri_pattern: String::from(route.uri.clone()),
-            uri: String::from(route.uri.clone())
+            uri: String::from(route.uri.clone()),
+            parsed_uri,
         }
     }
 }

@@ -1,64 +1,145 @@
-use crate::upstream::UpstreamService;
-use hyper::{body::Incoming, Response, StatusCode};
+use crate::upstream::{FailureKind, UpstreamService};
+use hyper::{body::Incoming, Response};
 use sguard_core::model::context::RequestContext;
-use sguard_error::ErrorType;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
+use sguard_error::{Error as AppError, ErrorType};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
+use tokio::sync::{Semaphore, SemaphorePermit};
 
-/// What the callback receives: the upstream response, or the HTTP status
-/// the gateway should answer with (502/504).
-pub type UpstreamResult = Result<Response<Incoming>, StatusCode>;
-pub type ResponseHandler = Box<dyn FnOnce(UpstreamResult) + Send>;
+/// Max requests in the "connect + send + wait for response headers" phase per route at once.
+const ROUTE_INFLIGHT_UPSTREAM: usize = 4096;
+/// Max requests allowed to wait for a permit per route. Beyond this the gateway sheds load (503)
+/// immediately instead of queueing without limit.
+const MAX_QUEUED: usize = 8192;
+/// Max time a request may wait for a permit before it is shed.
+const QUEUE_TIMEOUT: Duration = Duration::from_secs(2);
 
-pub struct StateMachineManager {
-    next_id: AtomicUsize,
-    /// One client and connection pool shared by every request.
-    upstream: Arc<UpstreamService>,
+struct Admission {
+    sem: Semaphore,
+    waiting: AtomicUsize,
+    rejected: AtomicU64,
 }
 
-impl StateMachineManager {
-    /// Create ONCE at startup and share via Arc. Creating it per request
-    /// throws the connection pool away.
-    pub fn new() -> Self {
+struct WaitGuard<'a>(&'a AtomicUsize);
+impl Drop for WaitGuard<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
+impl Admission {
+    fn new(inflight: usize) -> Self {
         Self {
-            next_id: AtomicUsize::new(0),
-            upstream: Arc::new(UpstreamService::new()),
+            sem: Semaphore::new(inflight),
+            waiting: AtomicUsize::new(0),
+            rejected: AtomicU64::new(0),
         }
     }
 
-    /// Runs the upstream call in a background task and invokes `response_handler`
-    /// exactly once, with either the response or an error status.
-    pub async fn create_state_machine(
-        &self,
-        req: RequestContext,
-        response_handler: Option<ResponseHandler>,
-    ) {
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+    async fn acquire(&self) -> Result<SemaphorePermit<'_>, AppError> {
+        // Fast path: no waiting, no counters touched
+        if let Ok(permit) = self.sem.try_acquire() {
+            return Ok(permit);
+        }
+        let queued = self.waiting.fetch_add(1, Ordering::Relaxed);
+        let _guard = WaitGuard(&self.waiting);
+
+        if queued >= MAX_QUEUED {
+            self.rejected.fetch_add(1, Ordering::Relaxed);
+            return Err(overloaded());
+        }
+        match tokio::time::timeout(QUEUE_TIMEOUT, self.sem.acquire()).await {
+            Ok(Ok(permit)) => Ok(permit),
+            _ => {
+                self.rejected.fetch_add(1, Ordering::Relaxed);
+                Err(overloaded())
+            }
+        }
+    }
+}
+
+fn overloaded() -> AppError {
+    AppError::new(ErrorType::Custom(String::from("Upstream overloaded"))) // -> 503
+}
+
+pub struct StateMachineManager {
+    /// One client and connection pool for the whole gateway.
+    upstream: Arc<UpstreamService>,
+    bulkheads: RwLock<HashMap<String, Arc<Admission>>>,
+    default_admission: Arc<Admission>,
+}
+
+impl StateMachineManager {
+    /// Create ONCE at startup (inside the tokio runtime).
+    pub fn new() -> Self {
+        let manager = Self {
+            upstream: Arc::new(UpstreamService::new()),
+            bulkheads: RwLock::new(HashMap::new()),
+            default_admission: Arc::new(Admission::new(ROUTE_INFLIGHT_UPSTREAM)),
+        };
+        manager.spawn_reporter();
+        manager
+    }
+
+    fn get_admission(&self, route_id: &str) -> Arc<Admission> {
+        if route_id.is_empty() {
+            return self.default_admission.clone();
+        }
+        {
+            let read = self.bulkheads.read().unwrap();
+            if let Some(adm) = read.get(route_id) {
+                return adm.clone();
+            }
+        }
+        let mut write = self.bulkheads.write().unwrap();
+        write
+            .entry(route_id.to_string())
+            .or_insert_with(|| Arc::new(Admission::new(ROUTE_INFLIGHT_UPSTREAM)))
+            .clone()
+    }
+
+    pub async fn forward(&self, req: &mut RequestContext) -> Result<Response<Incoming>, AppError> {
+        let admission = self.get_admission(&req.route_definition.id);
+        let _permit = admission.acquire().await?;
+        log::trace!("Forwarding to upstream for route {}", req.route_definition.id);
+        self.upstream.call_upstream_service(req).await
+        // permit released here, when the response headers have arrived
+    }
+
+    /// Logs one summary line every 10 s, but only when something went wrong.
+    /// This is what tells you the real root cause without a debugger.
+    fn spawn_reporter(&self) {
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
         let upstream = self.upstream.clone();
+        handle.spawn(async move {
+            let mut last = upstream.stats.snapshot();
+            let mut last_retries = 0u64;
+            let mut tick = tokio::time::interval(Duration::from_secs(10));
+            tick.tick().await;
+            loop {
+                tick.tick().await;
+                let now = upstream.stats.snapshot();
+                let retries = upstream.stats.retries.load(Ordering::Relaxed);
 
-        tokio::spawn(async move {
-            let mut req = req;
-            log::trace!("Request {} -> upstream {}", id, req.route_definition.id);
-
-            let result: UpstreamResult = match upstream.call_upstream_service(&mut req).await {
-                Ok(response) => {
-                    log::trace!("Request {} upstream status {}", id, response.status());
-                    Ok(response)
+                let mut parts: Vec<String> = Vec::new();
+                for kind in FailureKind::ALL {
+                    let delta = now[kind as usize] - last[kind as usize];
+                    if delta > 0 {
+                        parts.push(format!("{:?}={}", kind, delta));
+                    }
                 }
-                Err(err) => {
-                    log::warn!("Request {} upstream error: {:?}", id, err);
-                    Err(match err.etype {
-                        ErrorType::ConnectTimeout => StatusCode::GATEWAY_TIMEOUT, // 504
-                        _ => StatusCode::BAD_GATEWAY,                             // 502
-                    })
+                if retries > last_retries {
+                    parts.push(format!("retried={}", retries - last_retries));
                 }
-            };
-
-            match response_handler {
-                Some(callback) => callback(result),
-                None => log::trace!("Request {} finished with no handler", id),
+                if !parts.is_empty() {
+                    log::warn!("upstream last 10s: {}", parts.join(" "));
+                }
+                last = now;
+                last_retries = retries;
             }
         });
     }

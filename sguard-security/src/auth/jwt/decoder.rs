@@ -1,22 +1,26 @@
 use std::collections::HashSet;
+use std::sync::LazyLock;
 
 use jsonwebtoken::errors::Result as JWTResult;
 use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
 
 use crate::modal::Claims;
 
-pub fn extract_claim(token: &str) -> JWTResult<Claims> {
-    let secret = b"qwertyuiopasdfghjklzxcvbnm123456"; // Replace with your secret key
+static JWT_SECRET: &[u8] = b"qwertyuiopasdfghjklzxcvbnm123456";
 
-    // Decoding the token with the secret key
+static DECODING_KEY: LazyLock<DecodingKey> =
+    LazyLock::new(|| DecodingKey::from_secret(JWT_SECRET));
+
+static VALIDATION: LazyLock<Validation> = LazyLock::new(|| {
     let mut validation = Validation::new(Algorithm::HS256);
     validation.leeway = 0;
     validation.aud = Some(HashSet::from(["www.lekhabook.com".to_string()]));
     validation.validate_exp = true;
-    // Decode the token
-    let token_data = decode::<Claims>(token, &DecodingKey::from_secret(secret), &validation)?;
+    validation
+});
 
-    // Return the claims
+pub fn extract_claim(token: &str) -> JWTResult<Claims> {
+    let token_data = decode::<Claims>(token, &DECODING_KEY, &VALIDATION)?;
     Ok(token_data.claims)
 }
 
@@ -38,4 +42,37 @@ pub fn get_issuer_from_token(token: &str) -> Result<Option<String>, String> {
 
     // Extract the issuer
     Ok(decoded.claims.iss)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jsonwebtoken::{encode, EncodingKey, Header};
+
+    #[test]
+    fn test_extract_claim_with_cached_key() {
+        let claims = Claims {
+            sub: Some("user123".to_string()),
+            exp: Some(
+                (std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
+                    + 3600) as usize,
+            ),
+            iss: Some("test-issuer".to_string()),
+            aud: Some("www.lekhabook.com".to_string()),
+        };
+
+        let token = encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(JWT_SECRET),
+        )
+        .unwrap();
+
+        let extracted = extract_claim(&token).expect("token must decode successfully");
+        assert_eq!(extracted.sub, Some("user123".to_string()));
+        assert_eq!(extracted.aud, Some("www.lekhabook.com".to_string()));
+    }
 }

@@ -1060,6 +1060,7 @@ dependencies = [
 name = "sguard"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "log",
  "log4rs",
  "sguard-http",
@@ -1121,6 +1122,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "libc",
  "log",
  "serde",
  "serde_json",
@@ -1138,6 +1140,7 @@ name = "sguard-proxy"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "http-body-util",
  "hyper",
  "hyper-tls",
  "hyper-util",

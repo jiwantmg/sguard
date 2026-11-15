@@ -19,11 +19,9 @@ impl AuthConverter for CookieAuthConverter {
         &self,
         request: &dyn Authentication,
     ) -> Result<Box<dyn Authentication>, AuthError> {
-        println!("Converting request");
         let cookie_auth = request
             .downcast_ref::<CookieAuthToken>()
             .ok_or_else(|| AuthError::new(ErrorType::UnsupportedAuthentication))?;
-        println!("Cookie Auth: {:?}", cookie_auth.cookie);
         let session_id = &cookie_auth.cookie;
 
         if session_id.is_empty() {
@@ -34,7 +32,6 @@ impl AuthConverter for CookieAuthConverter {
         // TODO: Retrieve the associated user.
 
         let mut authentication = cookie_auth.clone();
-        println!("Session ID: {}", session_id);
         // Temporary validation for testing.
         if session_id == "valid-session-id" {
             authentication.set_authenticated(true);

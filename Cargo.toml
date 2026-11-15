@@ -15,6 +15,7 @@ members = [
 
 
 [workspace.dependencies]
+libc = "0.2"
 http = "1.2.0"
 log = "0.4.22"
 log4rs = "1.2"
